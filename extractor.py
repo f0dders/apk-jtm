@@ -37,19 +37,35 @@ DANGEROUS_PERMISSIONS = {
 }
 
 
+def _as_list(value, default=None) -> list:
+    """Safely coerce a MobSF field to a list regardless of what version returned."""
+    if isinstance(value, list):
+        return value
+    if value is None or isinstance(value, (int, float, bool)):
+        return default if default is not None else []
+    return default if default is not None else []
+
+
+def _as_dict(value, default=None) -> dict:
+    """Safely coerce a MobSF field to a dict."""
+    if isinstance(value, dict):
+        return value
+    return default if default is not None else {}
+
+
 def extract(report: dict) -> dict:
-    permissions = report.get("permissions", {})
+    permissions = _as_dict(report.get("permissions"))
     dangerous_perms = [
         {"name": k, "description": v.get("description", ""), "status": v.get("status", "")}
         for k, v in permissions.items()
-        if k in DANGEROUS_PERMISSIONS or v.get("status") == "dangerous"
+        if isinstance(v, dict) and (k in DANGEROUS_PERMISSIONS or v.get("status") == "dangerous")
     ]
 
     manifest_issues = _extract_manifest_issues(report)
     code_issues = _extract_code_issues(report)
     network_findings = _extract_network(report)
     trackers = _extract_trackers(report)
-    secrets = report.get("secrets", [])[:30]
+    secrets = _as_list(report.get("secrets"))[:30]
 
     return {
         "app": {
@@ -72,10 +88,10 @@ def extract(report: dict) -> dict:
         "network": network_findings,
         "trackers": trackers,
         "secrets": secrets,
-        "activities": report.get("activities", []),
-        "services": report.get("services", []),
-        "receivers": report.get("receivers", []),
-        "providers": report.get("providers", []),
+        "activities": _as_list(report.get("activities")),
+        "services": _as_list(report.get("services")),
+        "receivers": _as_list(report.get("receivers")),
+        "providers": _as_list(report.get("providers")),
         "exported_count": _count_exported(report),
     }
 
@@ -86,56 +102,60 @@ def _extract_manifest_issues(report: dict) -> list:
 
     if isinstance(manifest, dict):
         for severity in ("high", "warning", "info"):
-            for item in manifest.get(severity, []):
-                issues.append({
-                    "severity": severity,
-                    "title": item.get("title", ""),
-                    "description": item.get("description", ""),
-                })
+            for item in _as_list(manifest.get(severity)):
+                if isinstance(item, dict):
+                    issues.append({
+                        "severity": severity,
+                        "title": item.get("title", ""),
+                        "description": item.get("description", ""),
+                    })
     elif isinstance(manifest, list):
         for item in manifest:
-            issues.append({
-                "severity": item.get("severity", "info"),
-                "title": item.get("title", item.get("rule", "")),
-                "description": item.get("description", ""),
-            })
+            if isinstance(item, dict):
+                issues.append({
+                    "severity": item.get("severity", "info"),
+                    "title": item.get("title", item.get("rule", "")),
+                    "description": item.get("description", ""),
+                })
 
     return issues
 
 
 def _extract_code_issues(report: dict) -> list:
     issues = []
-    code = report.get("code_analysis", {})
+    code = _as_dict(report.get("code_analysis"))
 
-    if isinstance(code, dict):
-        findings = code.get("findings", code)
-        for key, value in findings.items():
-            if not isinstance(value, dict):
-                continue
-            severity = value.get("metadata", {}).get("severity", "").lower()
-            if severity not in ("high", "warning", "good"):
-                severity = value.get("severity", "info").lower()
-            if severity in ("high", "warning"):
-                issues.append({
-                    "severity": severity,
-                    "title": key,
-                    "description": value.get("metadata", {}).get("description", value.get("description", "")),
-                    "files": list(value.get("files", {}).keys())[:5],
-                })
+    findings = _as_dict(code.get("findings", code))
+    for key, value in findings.items():
+        if not isinstance(value, dict):
+            continue
+        severity = _as_dict(value.get("metadata")).get("severity", "").lower()
+        if severity not in ("high", "warning", "good"):
+            severity = value.get("severity", "info").lower()
+        if severity in ("high", "warning"):
+            issues.append({
+                "severity": severity,
+                "title": key,
+                "description": _as_dict(value.get("metadata")).get("description", value.get("description", "")),
+                "files": list(_as_dict(value.get("files")).keys())[:5],
+            })
 
     return issues[:40]
 
 
 def _extract_network(report: dict) -> dict:
-    domains = report.get("domains", {})
-    urls = report.get("urls", [])
-    emails = report.get("emails", [])
+    domains = _as_dict(report.get("domains"))
+    urls = _as_list(report.get("urls"))
+    emails = _as_list(report.get("emails"))
     network_security = report.get("network_security", {})
 
     flagged_domains = {
         domain: info for domain, info in domains.items()
-        if info.get("bad") == "yes" or info.get("geolocation")
+        if isinstance(info, dict) and (info.get("bad") == "yes" or info.get("geolocation"))
     }
+
+    cert_analysis = _as_dict(report.get("certificate_analysis"))
+    cert_issues = _as_list(cert_analysis.get("certificate_findings"))[:10]
 
     return {
         "domains": {
@@ -146,21 +166,23 @@ def _extract_network(report: dict) -> dict:
         "urls": urls[:30],
         "emails": emails[:20],
         "network_security_issues": network_security if isinstance(network_security, list) else [],
-        "certificate_issues": report.get("certificate_analysis", {}).get("certificate_findings", [])[:10],
+        "certificate_issues": cert_issues,
     }
 
 
 def _extract_trackers(report: dict) -> list:
     trackers = report.get("trackers", {})
     if isinstance(trackers, dict):
-        return trackers.get("detected_trackers", [])
-    return trackers if isinstance(trackers, list) else []
+        # MobSF may return detected_trackers as a list of names or as an int count
+        detected = trackers.get("detected_trackers", [])
+        return _as_list(detected)
+    return _as_list(trackers)
 
 
 def _count_exported(report: dict) -> dict:
     counts = {}
     for component in ("activities", "services", "receivers", "providers"):
-        items = report.get(component, [])
+        items = _as_list(report.get(component))
         counts[component] = sum(
             1 for item in items
             if isinstance(item, dict) and item.get("exported") == "true"

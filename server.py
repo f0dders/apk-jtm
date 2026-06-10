@@ -261,19 +261,15 @@ async def run_scan(
             client = MobSFClient(mobsf_url, mobsf_key)
 
             try:
-                upload = await asyncio.to_thread(client.upload, apk_path)
+                raw_report = await asyncio.to_thread(client.upload_and_scan, apk_path)
             except Exception as e:
-                send("error", {"message": f"MobSF upload failed: {e}"})
+                send("error", {"message": f"MobSF error: {e}"})
                 return
 
-            send("progress", {"stage": "scan", "message": "Scanning APK — this takes 30–90 seconds..."})
-
-            try:
-                await asyncio.to_thread(client.scan, upload["file_name"], upload["hash"])
-                raw_report = await asyncio.to_thread(_poll_report, client, upload["hash"])
-            except Exception as e:
-                send("error", {"message": f"MobSF scan failed: {e}"})
-                return
+            if raw_report.get("_cached"):
+                send("progress", {"stage": "scan", "message": "Already scanned — using cached MobSF results ⚡"})
+            else:
+                send("progress", {"stage": "scan", "message": "Scan complete."})
 
         send("progress", {"stage": "extract", "message": "Extracting key findings..."})
         import extractor

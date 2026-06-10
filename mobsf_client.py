@@ -51,9 +51,18 @@ class MobSFClient:
         file_name = upload_result["file_name"]
         hash = upload_result["hash"]
 
+        # Check if MobSF already has results for this APK (same hash = same file)
+        try:
+            report = self.get_report(hash)
+            if report.get("app_name"):
+                report["_cached"] = True
+                return report
+        except requests.HTTPError:
+            pass
+
+        # No cached result — run the full scan
         self.scan(file_name, hash)
 
-        # Poll until scan completes (report endpoint returns data once ready)
         for _ in range(60):
             try:
                 report = self.get_report(hash)

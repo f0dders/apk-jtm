@@ -8,8 +8,10 @@ def build_analysis_prompt(extracted: dict) -> str:
 
     sections = []
 
-    # ── Context block ────────────────────────────────────────────────────────
-    sections.append(f"""You are an expert mobile application security analyst. Your job is to analyse the MobSF static analysis results below and produce a clear, plain-English security report for a non-technical reader — someone who needs to decide whether this app is safe to use or allow on their network.
+    # ── System role + context block ──────────────────────────────────────────
+    sections.append(f"""You are an expert mobile application security analyst. Your job is to produce a clear, plain-English security report for a non-technical reader — someone who needs to decide whether this app is safe to use or allow on their network.
+
+**Critically:** you must use your existing knowledge about this app when writing the report. Do not treat findings in isolation — a permission or behaviour that looks alarming in an unknown app may be completely normal and expected for a well-known, trusted application. Your job is to give an accurate picture, not to generate false alarm.
 
 ## App Under Analysis
 - **Name:** {app['name']}
@@ -85,40 +87,50 @@ def build_analysis_prompt(extracted: dict) -> str:
 
 ---
 
-Using the findings above, write a security report with exactly these six sections. Use `##` for section headings.
+Write a security report with exactly these six sections. Use `##` for section headings.
+
+## App Context & Reputation
+Do you recognise this app? State clearly:
+- What it is and what it's designed to do
+- Who develops it and whether it is open-source, commercial, or unknown
+- Its general reputation in the security and developer community (trusted, controversial, unknown, known malware, etc.)
+- Whether the permissions and behaviours flagged below are **expected for this type of app** or genuinely suspicious
+
+If you do not recognise the app at all, say so plainly. This section should give the reader crucial context before they see the findings.
 
 ## Executive Summary
-2–3 sentences only. State what this app appears to be and its purpose, then give a single overall risk verdict in bold: **CRITICAL**, **HIGH**, **MEDIUM**, or **LOW**. Base the verdict on the MobSF score and the severity of findings.
+2–3 sentences. State what the app does and give an overall risk verdict in bold: **CRITICAL**, **HIGH**, **MEDIUM**, or **LOW**. This verdict must account for both the static analysis findings AND the app's known reputation and purpose — a trusted open-source tool with expected system permissions should not be rated the same as an unknown app with the same permissions.
 
 ## Top Security Findings
-List the most significant issues in descending priority. For each finding use this format:
+The most significant issues in descending priority. For each, use this format:
 
 **🔴 CRITICAL / 🟠 HIGH / 🟡 MEDIUM / 🟢 LOW — Finding title**
-One or two sentences: what it is, why it matters to a non-technical reader.
+One or two sentences: what it is, why it matters, and — importantly — whether it is concerning given this app's known purpose or whether it is expected behaviour.
 
-Include up to 8 findings. Omit severity levels that have no findings.
+Include up to 8 findings. For any finding that is a known false positive or expected behaviour for this app type, mark it explicitly: add *(expected for this app type)* or *(likely false positive)* after the severity label.
 
 ## Privacy Concerns
-What personal data can this app access, collect, or share? Cover permissions, trackers, and hardcoded endpoints. Use bullet points. 4–6 bullets max.
+What personal data can this app access, collect, or share? Be specific about permissions and which ones are justified by the app's purpose vs which are unexplained. 4–6 bullet points.
 
 ## Network & Data Activity
-Where does the app send data? Flag advertising networks, analytics, suspicious geographies, or unexpected third-party servers. Note anything that looks like covert data collection. 4–6 bullets max.
+Where does the app send data? Flag anything unexpected. Note if connections are consistent with the app's stated purpose. 4–6 bullet points.
 
 ## Red Flags
-Direct, unambiguous list of anything that suggests malicious behaviour, spyware characteristics, or dangerously poor security practice. If nothing rises to this level, write a single sentence: "No significant red flags identified."
+Unambiguous list of anything that suggests malicious behaviour, spyware, or dangerously poor security practice — **after accounting for the app's known purpose**. If nothing rises to this level, write one sentence: "No significant red flags identified."
 
 ## Verdict & Recommendations
-3–5 plain-English action items for someone deciding whether to install or permit this app. Start each with a strong verb (Install / Avoid / Remove / Monitor / Verify / Restrict).
+3–5 plain-English action items for someone deciding whether to install or allow this app. Factor in reputation. Start each with a strong verb (Install / Avoid / Remove / Monitor / Verify / Restrict).
 
 ---
 
-**Writing rules — follow these strictly:**
+**Rules — follow strictly:**
+- The "Hardcoded Secrets" findings often contain false positives: translation strings, UI label keys, or resource identifiers that look like credentials but are not. Identify and call these out rather than treating them as real leaked secrets
 - Do not open any section with "Based on", "Looking at the", or "It appears"
-- Do not repeat findings across sections — each section adds new information
-- Do not use "In conclusion", "Overall", or "To summarise" anywhere
-- If a section genuinely has nothing to report, write one sentence saying so
-- Use plain English — avoid jargon unless briefly explained
-- Be direct: if something is dangerous, say it is dangerous
+- Do not repeat the same finding across multiple sections
+- Do not use "In conclusion", "Overall", or "To summarise"
+- If a section has nothing meaningful to add, write one sentence saying so
+- Be direct: if something is genuinely dangerous, say it is; if it is not, say that too
+- Use plain English throughout — briefly explain any technical terms
 """
 
     return prompt_body

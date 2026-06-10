@@ -163,6 +163,11 @@ body {
 }
 .report-body hr { border: none; border-top: 1px solid #e5e7eb; margin: 24px 0; }
 
+/* ── Risk disclaimer ── */
+.risk-disclaimer {
+  font-size: 0.75em; color: #9ca3af; margin-top: 8px; font-style: italic;
+}
+
 /* ── Footer ── */
 .report-footer {
   text-align: center; margin-top: 20px;
@@ -243,6 +248,7 @@ def _build_html(app_info: dict, ai_report: str, timestamp: str) -> str:
       &nbsp;·&nbsp; Min SDK {_esc(str(app_info.get('min_sdk', '?')))}
     </div>
     <span class="risk-badge risk-{risk_cls}">{risk_label}</span>
+    <div class="risk-disclaimer">Based on static analysis only — does not reflect app reputation or intended purpose</div>
     <div class="stat-chips">{chips}</div>
   </div>
 </div>
@@ -251,7 +257,7 @@ def _build_html(app_info: dict, ai_report: str, timestamp: str) -> str:
   <span><strong>File:</strong> {_esc(app_info.get('file_name', 'N/A'))}</span>
   <span><strong>Size:</strong> {_esc(str(app_info.get('size', 'N/A')))}</span>
   <span><strong>MD5:</strong> {_esc(app_info.get('md5', 'N/A'))}</span>
-  <span><strong>Avg CVSS:</strong> {_esc(str(app_info.get('average_cvss', 'N/A')))}</span>
+  {f'<span><strong>Avg CVSS:</strong> {_esc(str(cvss))}</span>' if (cvss := app_info.get('average_cvss')) and str(cvss).lower() not in ('none', 'n/a', '0', '0.0', '') else ''}
   <span><strong>Generated:</strong> {dt}</span>
 </div>
 
@@ -290,13 +296,14 @@ def _build_chips(app_info: dict) -> str:
     level = "danger" if issues > 10 else "warn" if issues > 3 else ""
     chips.append(_chip("⚠️", f"{issues} Code Issues", level))
 
-    cvss = app_info.get("average_cvss", "N/A")
-    try:
-        cvss_f = float(cvss)
-        level = "danger" if cvss_f >= 7 else "warn" if cvss_f >= 4 else ""
-    except (ValueError, TypeError):
-        level = ""
-    chips.append(_chip("📊", f"CVSS {cvss}", level))
+    cvss = app_info.get("average_cvss")
+    if cvss and str(cvss).lower() not in ("none", "n/a", "0", "0.0", ""):
+        try:
+            cvss_f = float(cvss)
+            level = "danger" if cvss_f >= 7 else "warn" if cvss_f >= 4 else ""
+        except (ValueError, TypeError):
+            level = ""
+        chips.append(_chip("📊", f"CVSS {cvss}", level))
 
     return "\n".join(chips)
 

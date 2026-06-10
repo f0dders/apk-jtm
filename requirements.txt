@@ -1,0 +1,19 @@
+# Web server
+fastapi>=0.111.0
+uvicorn>=0.30.0
+sse-starlette>=2.1.0
+python-multipart>=0.0.9
+aiofiles>=23.2.1
+
+# Core
+requests>=2.31.0
+rich>=13.7.0
+python-dotenv>=1.0.0
+
+# Local providers
+ollama>=0.1.7
+
+# Cloud providers
+openai>=1.30.0        # also covers Groq, Mistral, OpenRouter, LM Studio (all OpenAI-compatible)
+anthropic>=0.28.0
+google-generativeai>=0.7.0

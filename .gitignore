@@ -1,0 +1,27 @@
+# Secrets — never commit
+.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+venv/
+.venv/
+
+# App-generated output
+reports/
+uploads/
+mobsf_raw.json
+report_*.html
+report_*.md
+
+# APK files
+*.apk
+
+# IDE / local tooling
+.claude/
+.DS_Store
+
+# Root-level logo duplicate (canonical copy is static/logo.png)
+/logo.png

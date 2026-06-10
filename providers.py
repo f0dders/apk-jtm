@@ -178,9 +178,11 @@ class OpenRouterProvider:
 
     def stream(self, prompt: str) -> Iterator[str]:
         from openai import OpenAI
+        import httpx
         client = OpenAI(
             base_url="https://openrouter.ai/api/v1",
             api_key=self.api_key,
+            timeout=httpx.Timeout(connect=15.0, read=120.0, write=15.0, pool=5.0),
             default_headers={
                 "HTTP-Referer": "https://github.com/apk-analyser",
                 "X-Title": "APK Security Analyser",

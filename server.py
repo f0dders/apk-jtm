@@ -295,12 +295,40 @@ async def run_scan(
         prompt = build_analysis_prompt(extracted)
 
         ai_chunks = []
+        chunk_queue: asyncio.Queue = asyncio.Queue()
+
+        async def _feed_queue():
+            """Run the synchronous provider stream in a thread, putting chunks on the queue."""
+            loop = asyncio.get_event_loop()
+            try:
+                def _run():
+                    try:
+                        for chunk in provider.stream(prompt):
+                            loop.call_soon_threadsafe(chunk_queue.put_nowait, ("chunk", chunk))
+                    except Exception as exc:
+                        loop.call_soon_threadsafe(chunk_queue.put_nowait, ("error", str(exc)))
+                    finally:
+                        loop.call_soon_threadsafe(chunk_queue.put_nowait, ("done", None))
+                await asyncio.to_thread(_run)
+            except Exception as exc:
+                chunk_queue.put_nowait(("error", str(exc)))
+
+        feed_task = asyncio.create_task(_feed_queue())
+
         try:
-            for chunk in await asyncio.to_thread(_stream_sync, provider, prompt):
-                send("analysis", chunk)
-                ai_chunks.append(chunk)
-        except Exception as e:
-            send("error", {"message": f"AI analysis failed: {e}"})
+            while True:
+                kind, value = await asyncio.wait_for(chunk_queue.get(), timeout=120)
+                if kind == "error":
+                    send("error", {"message": f"AI analysis failed: {value}"})
+                    feed_task.cancel()
+                    return
+                if kind == "done":
+                    break
+                send("analysis", value)
+                ai_chunks.append(value)
+        except asyncio.TimeoutError:
+            send("error", {"message": "AI analysis timed out after 2 minutes — the model may be busy or the model name is wrong."})
+            feed_task.cancel()
             return
 
         full_report = "".join(ai_chunks)

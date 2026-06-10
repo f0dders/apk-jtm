@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="static/logo.png" alt="APK-JTM" width="120">
+</p>
+
 # APK-JTM — Just tell me if it's dodgy!
 
 Analyses Android APKs using [MobSF](https://github.com/MobSF/Mobile-Security-Framework-MobSF) for static analysis, then passes the findings to an AI model to produce a plain-English security report — no pentesting background required.

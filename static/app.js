@@ -712,6 +712,15 @@ function reportCard(r) {
   const permsEl  = r.perms    != null ? `<span class="card-chip">🔒 ${r.perms} perms</span>` : '';
   const trackEl  = r.trackers != null ? `<span class="card-chip">📡 ${r.trackers} trackers</span>` : '';
 
+  const tierColours = { frontier: '#10b981', capable: '#3b82f6', basic: '#f59e0b', unknown: '#9ca3af' };
+  const tierEl = r.ai_model ? (() => {
+    const tier   = r.ai_model_tier || 'unknown';
+    const label  = r.ai_tier_label || 'Unknown';
+    const colour = tierColours[tier] || '#9ca3af';
+    const modelDisplay = r.ai_model.length > 36 ? r.ai_model.slice(0, 34) + '\u2026' : r.ai_model;
+    return `<div class="card-model"><span class="card-tier-badge" style="background:${colour}">${label}</span><span class="card-model-name">${modelDisplay}</span></div>`;
+  })() : '';
+
   return `
     <div class="report-card" onclick="openReport('${r.url}')">
       <div class="card-score-wrap">${scoreEl}</div>
@@ -720,6 +729,7 @@ function reportCard(r) {
         <div class="card-package">${r.package || ''}</div>
         <div class="card-chips">${badgeEl}${permsEl}${trackEl}</div>
         <div class="card-date">${dateStr} at ${timeStr} · ${size}</div>
+        ${tierEl}
       </div>
       <div class="card-actions" onclick="event.stopPropagation()">
         <button class="btn-icon" title="Open" onclick="openReport('${r.url}')">↗</button>

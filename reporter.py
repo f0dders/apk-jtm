@@ -3,6 +3,7 @@ from datetime import datetime
 from pathlib import Path
 
 import markdown as md
+from model_tier import TIER_META
 
 
 # ---------------------------------------------------------------------------
@@ -222,6 +223,31 @@ details.chip.danger .chip-list li { background: rgba(220,38,38,0.08); }
   font-size: 0.75em; color: #9ca3af; margin-top: 8px; font-style: italic;
 }
 
+/* ── Model tier badge ── */
+.model-info {
+  display: flex; align-items: center; gap: 8px;
+  margin-top: 14px; flex-wrap: wrap;
+}
+.model-label {
+  font-size: 0.78em; color: #6b7280;
+}
+.model-name {
+  font-size: 0.78em; font-weight: 600; color: #374151;
+  font-family: 'SF Mono','Fira Code',monospace;
+}
+.tier-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 10px; border-radius: 99px;
+  font-size: 0.72em; font-weight: 700; letter-spacing: 0.05em;
+  text-transform: uppercase; color: #fff;
+}
+.model-disclaimer {
+  background: #fffbeb; border: 1px solid #fde68a; border-radius: 10px;
+  padding: 10px 16px; margin-bottom: 16px;
+  font-size: 0.83em; color: #92400e; display: flex; gap: 8px; align-items: flex-start;
+}
+.model-disclaimer-icon { flex-shrink: 0; font-size: 1.1em; }
+
 /* ── Footer ── */
 .report-footer {
   text-align: center; margin-top: 20px;
@@ -250,6 +276,8 @@ def save_report(app_info: dict, ai_report: str, output_dir: str = ".") -> str:
 
     score = _parse_score(app_info.get("security_score", 0))
     risk_label, risk_cls, _ = _risk(score)
+    tier = app_info.get("ai_model_tier", "unknown")
+    tier_label, _, _ = TIER_META[tier]
     meta_path.write_text(_json.dumps({
         "app_name":    app_info.get("name", "Unknown"),
         "package":     app_info.get("package", ""),
@@ -260,6 +288,10 @@ def save_report(app_info: dict, ai_report: str, output_dir: str = ".") -> str:
         "timestamp":   timestamp,
         "perms":       app_info.get("dangerous_perms_count", 0),
         "trackers":    app_info.get("trackers_count", 0),
+        "ai_provider": app_info.get("ai_provider", ""),
+        "ai_model":    app_info.get("ai_model", ""),
+        "ai_model_tier": tier,
+        "ai_tier_label": tier_label,
     }, indent=2))
 
     return str(html_path)
@@ -305,6 +337,30 @@ def _build_html(app_info: dict, ai_report: str, timestamp: str) -> str:
         '<div class="app-icon-placeholder">📱</div>'
     )
 
+    ai_model    = app_info.get("ai_model", "")
+    ai_provider = app_info.get("ai_provider", "")
+    tier        = app_info.get("ai_model_tier", "unknown")
+    tier_label, tier_colour, tier_disclaimer = TIER_META[tier]
+
+    model_info_html = ""
+    if ai_model:
+        model_info_html = (
+            f'<div class="model-info">'
+            f'<span class="model-label">Analysed by</span>'
+            f'<span class="model-name">{_esc(ai_model)}</span>'
+            f'<span class="tier-badge" style="background:{tier_colour}">{tier_label}</span>'
+            f'</div>'
+        )
+
+    disclaimer_html = ""
+    if tier_disclaimer:
+        disclaimer_html = (
+            f'<div class="model-disclaimer">'
+            f'<span class="model-disclaimer-icon">⚠️</span>'
+            f'<span>{tier_disclaimer}</span>'
+            f'</div>'
+        )
+
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -329,10 +385,11 @@ def _build_html(app_info: dict, ai_report: str, timestamp: str) -> str:
     <span class="risk-badge risk-{risk_cls}">{risk_label}</span>
     <div class="risk-disclaimer">Based on static analysis only — does not reflect app reputation or intended purpose</div>
     <div class="stat-chips">{chips}</div>
+    {model_info_html}
   </div>
 </div>
 
-<div class="meta-strip">
+{disclaimer_html}<div class="meta-strip">
   <span><strong>File:</strong> {_esc(app_info.get('file_name', 'N/A'))}</span>
   <span><strong>Size:</strong> {_esc(str(app_info.get('size', 'N/A')))}</span>
   <span><strong>MD5:</strong> {_esc(app_info.get('md5', 'N/A'))}</span>

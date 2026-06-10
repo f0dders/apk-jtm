@@ -367,6 +367,7 @@ async def run_scan(
         full_report = "".join(ai_chunks)
 
         import reporter
+        from model_tier import classify as _classify_model
 
         # Fetch app icon from MobSF (APK scan path only; best-effort)
         icon_b64 = None
@@ -405,6 +406,9 @@ async def run_scan(
             "code_issues_list": [i.get("title", "")[:60] for i in extracted["code_issues"][:15]],
             "manifest_issues_count": len(extracted["manifest_issues"]),
             "icon_b64": icon_b64,
+            "ai_provider": provider_name,
+            "ai_model": provider.model,
+            "ai_model_tier": _classify_model(provider.model),
         }
         report_html_path = reporter.save_report(app_meta, full_report, str(REPORTS_DIR))
 

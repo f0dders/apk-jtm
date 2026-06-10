@@ -26,13 +26,56 @@ If not installed, download it from **https://www.python.org/downloads/**
 
 ---
 
-### Step 2 — Install Docker (for MobSF)
+### Step 2 — Install Docker and start MobSF
 
-MobSF is the scanning engine that analyses the APK before the AI steps in.
+MobSF (Mobile Security Framework) is the scanning engine that tears apart the APK before the AI steps in. It runs locally in Docker — you don't need to know how Docker works.
 
-Download **Docker Desktop** from **https://www.docker.com/products/docker-desktop** and install it. You don't need to know how to use Docker — the launcher handles everything.
+#### 2a — Install Docker Desktop
 
-> If you already have MobSF running elsewhere, or just want to test with an existing MobSF JSON report, you can skip this step.
+Download from **https://www.docker.com/products/docker-desktop** and install it. Once installed, open Docker Desktop and leave it running in the background.
+
+> **Windows:** you may be prompted to install WSL 2 during Docker setup — follow the on-screen instructions if so.
+
+#### 2b — Start MobSF
+
+Open a Terminal (Mac/Linux) or Command Prompt (Windows) and run:
+
+```
+docker run -it --rm -p 8000:8000 opensecurity/mobile-security-framework-mobsf:latest
+```
+
+MobSF will download on first run (~1–2 GB) and then start. You'll see a line like:
+
+```
+* Running on http://0.0.0.0:8000
+```
+
+Once you see that, open **http://localhost:8000** in your browser to confirm it's running.
+
+> **Tip:** MobSF takes 30–60 seconds to fully start. If the page doesn't load immediately, wait a moment and refresh.
+
+#### 2c — Get your MobSF API key
+
+1. Go to **http://localhost:8000**
+2. Click the menu icon in the top-right corner
+3. Select **REST API**
+4. Copy the API key shown — you'll paste this into the app's setup wizard
+
+> The API key is the same every time MobSF starts, so you only need to copy it once.
+
+#### Keeping MobSF running
+
+You need MobSF running whenever you want to scan a new APK. To stop it, press `Ctrl+C` in the terminal where it's running. To restart it, run the same `docker run` command above.
+
+**Shortcut for repeat use** — to run MobSF in the background (so it doesn't occupy a terminal window):
+
+```
+docker run -d --name mobsf -p 8000:8000 opensecurity/mobile-security-framework-mobsf:latest
+```
+
+Then to stop it: `docker stop mobsf` and to start it again: `docker start mobsf`
+
+> If you already have MobSF running elsewhere, or just want to analyse an existing MobSF JSON report without scanning, you can skip this step entirely.
 
 ---
 
@@ -64,9 +107,11 @@ Subsequent launches are faster — the setup only runs once.
 
 On your first visit, a 3-step wizard will guide you through:
 
-1. **MobSF** — paste your API key (shown at `http://localhost:8000` → top-right menu → REST API)
-2. **AI provider** — choose offline (Ollama or LM Studio) or cloud (Claude, OpenAI, Gemini)
+1. **MobSF** — confirm the URL (default `http://localhost:8000`) and paste your API key (see Step 2c above)
+2. **AI provider** — choose offline (Ollama or LM Studio) or cloud (Claude, OpenAI, Gemini, Groq, Mistral, OpenRouter)
 3. **Configure** — enter your model name or API key for the chosen provider
+
+Your settings are saved locally in a `.env` file. To change them later, click the ⚙ icon in the top-right of the app.
 
 Your settings are saved locally in a `.env` file and remembered for future sessions.
 
@@ -87,11 +132,16 @@ Your settings are saved locally in a `.env` file and remembered for future sessi
 
 ### Cloud (best quality, requires internet)
 
-| Provider | Where to get a key |
-|---|---|
-| **Claude** (recommended) | [console.anthropic.com](https://console.anthropic.com) |
-| **OpenAI** | [platform.openai.com/api-keys](https://platform.openai.com/api-keys) |
-| **Gemini** | [aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey) |
+| Provider | Where to get a key | Notes |
+|---|---|---|
+| **Claude** (recommended) | [console.anthropic.com](https://console.anthropic.com) | Best analysis quality |
+| **OpenAI** | [platform.openai.com/api-keys](https://platform.openai.com/api-keys) | GPT-4o and above |
+| **Gemini** | [aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey) | Free tier available |
+| **Groq** | [console.groq.com](https://console.groq.com) | Very fast, free tier, no credit card |
+| **Mistral** | [console.mistral.ai](https://console.mistral.ai) | Strong EU-based option |
+| **OpenRouter** | [openrouter.ai/keys](https://openrouter.ai/keys) | One key, 100+ models including free ones |
+
+> **OpenRouter model names** must use the `provider/model` format — e.g. `anthropic/claude-sonnet-4-6`, `openai/gpt-4o`, or `meta-llama/llama-3.3-70b-instruct:free`. Browse all available models at [openrouter.ai/models](https://openrouter.ai/models). Note that very large free-tier models (200B+) can take 2–5 minutes to respond.
 
 ---
 

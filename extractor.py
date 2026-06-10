@@ -157,17 +157,40 @@ def _extract_network(report: dict) -> dict:
     cert_analysis = _as_dict(report.get("certificate_analysis"))
     cert_issues = _as_list(cert_analysis.get("certificate_findings"))[:10]
 
+    server_locations = _extract_server_locations(domains)
+
     return {
         "domains": {
             "all": list(domains.keys())[:50],
             "flagged": flagged_domains,
             "count": len(domains),
         },
+        "server_locations": server_locations,
         "urls": urls[:30],
         "emails": emails[:20],
         "network_security_issues": network_security if isinstance(network_security, list) else [],
         "certificate_issues": cert_issues,
     }
+
+
+def _extract_server_locations(domains: dict) -> dict:
+    """Build a country → [domains] mapping from MobSF geolocation data."""
+    countries: dict[str, list[str]] = {}
+    for domain, info in domains.items():
+        if not isinstance(info, dict):
+            continue
+        geo = info.get("geolocation")
+        if not isinstance(geo, dict):
+            continue
+        country = (
+            geo.get("country_long")
+            or geo.get("country")
+            or geo.get("country_short", "")
+        ).strip()
+        if country and country.upper() not in ("", "N/A", "UNKNOWN"):
+            countries.setdefault(country, []).append(domain)
+    # Sort by number of domains descending
+    return dict(sorted(countries.items(), key=lambda kv: -len(kv[1])))
 
 
 def _extract_trackers(report: dict) -> list:

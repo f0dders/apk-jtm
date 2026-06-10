@@ -709,6 +709,14 @@ function reportCard(r) {
     ? `<span class="risk-badge-sm risk-${riskCls}">${riskLabel}</span>`
     : '';
 
+  const verdictColours = { LOW: '#10b981', MEDIUM: '#f59e0b', HIGH: '#ef4444', CRITICAL: '#be123c' };
+  const verdictEl = r.ai_verdict ? (() => {
+    const v      = r.ai_verdict.toUpperCase();
+    const label  = r.ai_verdict_label || (v[0] + v.slice(1).toLowerCase() + ' Risk');
+    const colour = verdictColours[v] || '#9ca3af';
+    return `<span class="card-ai-verdict" style="border-color:${colour};color:${colour}">AI: ${label}</span>`;
+  })() : '';
+
   const permsEl  = r.perms    != null ? `<span class="card-chip">🔒 ${r.perms} perms</span>` : '';
   const trackEl  = r.trackers != null ? `<span class="card-chip">📡 ${r.trackers} trackers</span>` : '';
 
@@ -727,7 +735,7 @@ function reportCard(r) {
       <div class="card-body">
         <div class="card-title">${appName} <span class="card-version">${version}</span></div>
         <div class="card-package">${r.package || ''}</div>
-        <div class="card-chips">${badgeEl}${permsEl}${trackEl}</div>
+        <div class="card-chips">${badgeEl}${verdictEl}${permsEl}${trackEl}</div>
         <div class="card-date">${dateStr} at ${timeStr} · ${size}</div>
         ${tierEl}
       </div>

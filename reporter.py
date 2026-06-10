@@ -47,6 +47,19 @@ def _score_ring_svg(score: int, colour: str) -> str:
 </svg>"""
 
 
+def _verdict_display(verdict: str | None) -> tuple[str, str]:
+    """Returns (display_label, css_class) for the AI contextual verdict."""
+    mapping = {
+        "LOW":      ("Low Risk",      "low"),
+        "MEDIUM":   ("Medium Risk",   "medium"),
+        "HIGH":     ("High Risk",     "high"),
+        "CRITICAL": ("Critical Risk", "critical"),
+    }
+    if verdict and verdict.upper() in mapping:
+        return mapping[verdict.upper()]
+    return ("Unknown", "unknown")
+
+
 def _chip(icon: str, label: str, items: list, level: str = "") -> str:
     """Renders a stat chip. If items are provided, wraps in <details> for expand/collapse."""
     cls = f"chip {level}".strip()
@@ -218,9 +231,22 @@ details.chip.danger .chip-list li { background: rgba(220,38,38,0.08); }
 }
 .report-body hr { border: none; border-top: 1px solid #e5e7eb; margin: 24px 0; }
 
-/* ── Risk disclaimer ── */
-.risk-disclaimer {
-  font-size: 0.75em; color: #9ca3af; margin-top: 8px; font-style: italic;
+/* ── Verdict row ── */
+.verdict-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+.verdict-label { font-size: 0.72em; color: #9ca3af; font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; }
+.verdict-sep { color: #d1d5db; font-size: 0.9em; }
+.ai-verdict-badge {
+  display: inline-block; padding: 4px 14px; border-radius: 99px;
+  font-size: 0.75em; font-weight: 700; letter-spacing: 0.06em;
+  text-transform: uppercase; border: 2px solid currentColor;
+}
+.ai-verdict-low      { color: #065f46; border-color: #10b981; background: #d1fae5; }
+.ai-verdict-medium   { color: #92400e; border-color: #f59e0b; background: #fef3c7; }
+.ai-verdict-high     { color: #991b1b; border-color: #ef4444; background: #fee2e2; }
+.ai-verdict-critical { color: #881337; border-color: #be123c; background: #ffe4e6; }
+.ai-verdict-unknown  { color: #6b7280; border-color: #9ca3af; background: #f3f4f6; }
+.verdict-note {
+  font-size: 0.72em; color: #9ca3af; margin-top: 4px; font-style: italic;
 }
 
 /* ── Model tier badge ── */
@@ -278,20 +304,25 @@ def save_report(app_info: dict, ai_report: str, output_dir: str = ".") -> str:
     risk_label, risk_cls, _ = _risk(score)
     tier = app_info.get("ai_model_tier", "unknown")
     tier_label, _, _ = TIER_META[tier]
+    ai_verdict_raw = app_info.get("ai_verdict")
+    ai_verdict_label, ai_verdict_cls = _verdict_display(ai_verdict_raw)
     meta_path.write_text(_json.dumps({
-        "app_name":    app_info.get("name", "Unknown"),
-        "package":     app_info.get("package", ""),
-        "version":     app_info.get("version", ""),
-        "score":       score,
-        "risk_label":  risk_label,
-        "risk_cls":    risk_cls,
-        "timestamp":   timestamp,
-        "perms":       app_info.get("dangerous_perms_count", 0),
-        "trackers":    app_info.get("trackers_count", 0),
-        "ai_provider": app_info.get("ai_provider", ""),
-        "ai_model":    app_info.get("ai_model", ""),
-        "ai_model_tier": tier,
-        "ai_tier_label": tier_label,
+        "app_name":       app_info.get("name", "Unknown"),
+        "package":        app_info.get("package", ""),
+        "version":        app_info.get("version", ""),
+        "score":          score,
+        "risk_label":     risk_label,
+        "risk_cls":       risk_cls,
+        "timestamp":      timestamp,
+        "perms":          app_info.get("dangerous_perms_count", 0),
+        "trackers":       app_info.get("trackers_count", 0),
+        "ai_provider":    app_info.get("ai_provider", ""),
+        "ai_model":       app_info.get("ai_model", ""),
+        "ai_model_tier":  tier,
+        "ai_tier_label":  tier_label,
+        "ai_verdict":     ai_verdict_raw,
+        "ai_verdict_label": ai_verdict_label,
+        "ai_verdict_cls": ai_verdict_cls,
     }, indent=2))
 
     return str(html_path)
@@ -342,6 +373,20 @@ def _build_html(app_info: dict, ai_report: str, timestamp: str) -> str:
     tier        = app_info.get("ai_model_tier", "unknown")
     tier_label, tier_colour, tier_disclaimer = TIER_META[tier]
 
+    ai_verdict_raw              = app_info.get("ai_verdict")
+    ai_verdict_label, ai_verdict_cls = _verdict_display(ai_verdict_raw)
+
+    # Dual verdict row: static score badge + AI contextual verdict badge
+    ai_badge_html = (
+        f'<span class="ai-verdict-badge ai-verdict-{ai_verdict_cls}">AI: {ai_verdict_label}</span>'
+        if ai_verdict_raw else ""
+    )
+    verdict_note = (
+        "Static score is purely automated; AI verdict accounts for app reputation and purpose."
+        if ai_verdict_raw else
+        "Based on static analysis only — does not reflect app reputation or intended purpose."
+    )
+
     model_info_html = ""
     if ai_model:
         model_info_html = (
@@ -382,8 +427,14 @@ def _build_html(app_info: dict, ai_report: str, timestamp: str) -> str:
       &nbsp;·&nbsp; Target SDK {_esc(str(app_info.get('target_sdk', '?')))}
       &nbsp;·&nbsp; Min SDK {_esc(str(app_info.get('min_sdk', '?')))}
     </div>
-    <span class="risk-badge risk-{risk_cls}">{risk_label}</span>
-    <div class="risk-disclaimer">Based on static analysis only — does not reflect app reputation or intended purpose</div>
+    <div class="verdict-row">
+      <div>
+        <span class="verdict-label">Static score</span>
+        <span class="risk-badge risk-{risk_cls}">{risk_label}</span>
+      </div>
+      {f'<span class="verdict-sep">·</span><div><span class="verdict-label">AI verdict</span>{ai_badge_html}</div>' if ai_badge_html else ''}
+    </div>
+    <div class="verdict-note">{verdict_note}</div>
     <div class="stat-chips">{chips}</div>
     {model_info_html}
   </div>

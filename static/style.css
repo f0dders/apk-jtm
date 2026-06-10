@@ -260,6 +260,7 @@ select option { background: var(--surface2); }
 .card-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 5px; }
 .card-chip { font-size: 11px; color: var(--text-muted); background: var(--surface); border: 1px solid var(--border); border-radius: 5px; padding: 1px 7px; }
 .card-date { font-size: 11px; color: var(--text-muted); }
+.card-ai-verdict { font-size: 10px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; padding: 1px 8px; border-radius: 99px; border: 1.5px solid; background: transparent; white-space: nowrap; }
 .card-model { display: flex; align-items: center; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
 .card-tier-badge { font-size: 10px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: #fff; padding: 2px 8px; border-radius: 99px; flex-shrink: 0; }
 .card-model-name { font-size: 11px; color: var(--text-muted); font-family: 'SF Mono','Fira Code',monospace; }

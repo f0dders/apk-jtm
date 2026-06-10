@@ -80,6 +80,14 @@ def build_analysis_prompt(extracted: dict) -> str:
         cert_text = "\n".join(f"- {i}" for i in net["certificate_issues"])
         sections.append(f"## Certificate Issues\n{cert_text}")
 
+    locations = net.get("server_locations", {})
+    if locations:
+        loc_lines = "\n".join(
+            f"- **{country}**: {', '.join(domains[:6])}{', …' if len(domains) > 6 else ''}"
+            for country, domains in locations.items()
+        )
+        sections.append(f"## Server Locations (MobSF geolocation data)\n{loc_lines}")
+
     # ── Instructions ─────────────────────────────────────────────────────────
     prompt_body = "\n\n".join(sections)
 
@@ -115,6 +123,16 @@ What personal data can this app access, collect, or share? Be specific about per
 ## Network & Data Activity
 Where does the app send data? Flag anything unexpected. Note if connections are consistent with the app's stated purpose. 4–6 bullet points.
 
+## Geographic & Server Analysis
+Where are this app's servers hosted, and what does that mean for user privacy? Use the Server Locations data above. Cover:
+- Which countries host the majority of the app's network infrastructure, and name them explicitly
+- Whether those countries have strong data protection laws (e.g. EU/GDPR, UK/DPA, Canada/PIPEDA) or weak/absent protections
+- Flag any servers in countries with mandatory government data access laws or known state surveillance programmes (e.g. China, Russia, Iran) — explain what that means in practice for the user's data
+- Whether the developer's apparent country of origin matches the server locations or raises questions
+- Note if the jurisdiction is unclear (no geolocation data available)
+- Conclude with a geographic risk rating: **Low** (GDPR/Five Eyes jurisdictions with strong privacy laws), **Medium** (mixed or unclear jurisdictions), or **High** (countries with poor data protection or active state surveillance)
+3–5 bullet points.
+
 ## Red Flags
 Unambiguous list of anything that suggests malicious behaviour, spyware, or dangerously poor security practice — **after accounting for the app's known purpose**. If nothing rises to this level, write one sentence: "No significant red flags identified."
 
@@ -131,6 +149,10 @@ Unambiguous list of anything that suggests malicious behaviour, spyware, or dang
 - If a section has nothing meaningful to add, write one sentence saying so
 - Be direct: if something is genuinely dangerous, say it is; if it is not, say that too
 - Use plain English throughout — briefly explain any technical terms
+
+**Finally — write this as the absolute last line of your response, nothing after it:**
+VERDICT: LOW
+(Replace LOW with your contextual verdict: LOW, MEDIUM, HIGH, or CRITICAL. This must reflect your reasoned assessment, not the raw MobSF score.)
 """
 
     return prompt_body

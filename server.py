@@ -364,7 +364,20 @@ async def run_scan(
             feed_task.cancel()
             return
 
-        full_report = "".join(ai_chunks)
+        import re as _re
+        full_report_raw = "".join(ai_chunks)
+
+        # Extract machine-readable verdict from last line before rendering
+        verdict_match = _re.search(
+            r'^VERDICT:\s*(LOW|MEDIUM|HIGH|CRITICAL)\s*$',
+            full_report_raw, _re.IGNORECASE | _re.MULTILINE
+        )
+        ai_verdict = verdict_match.group(1).upper() if verdict_match else None
+        # Strip the tag line from the rendered report
+        full_report = _re.sub(
+            r'\n*^VERDICT:\s*(LOW|MEDIUM|HIGH|CRITICAL)\s*$\n*',
+            '', full_report_raw, flags=_re.IGNORECASE | _re.MULTILINE
+        ).strip()
 
         import reporter
         from model_tier import classify as _classify_model
@@ -409,6 +422,7 @@ async def run_scan(
             "ai_provider": provider_name,
             "ai_model": provider.model,
             "ai_model_tier": _classify_model(provider.model),
+            "ai_verdict": ai_verdict,
         }
         report_html_path = reporter.save_report(app_meta, full_report, str(REPORTS_DIR))
 

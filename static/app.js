@@ -414,11 +414,20 @@ const STAGE_LABELS = {
   analysis: 'AI analysis',
 };
 
+function resetProgressView() {
+  $('progress-stages').innerHTML = '';
+  $('progress-terminal').textContent = '';
+  hide('progress-terminal-wrap');
+  hide('progress-meta');
+  hide('btn-view-report');
+  show('btn-cancel-scan');
+}
+
 function streamProgress(scanId) {
+  resetProgressView();
   const terminal = $('progress-terminal');
   const stagesEl = $('progress-stages');
   const stages = {};
-  terminal.textContent = '';
 
   function getOrCreateStage(key) {
     if (stages[key]) return stages[key];

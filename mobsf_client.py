@@ -46,6 +46,16 @@ class MobSFClient:
         response.raise_for_status()
         return response.json()
 
+    def _merge_scorecard(self, report: dict, hash: str) -> dict:
+        """Fetch scorecard and merge security_score + average_cvss into the report."""
+        try:
+            scorecard = self.get_scorecard(hash)
+            report["security_score"] = scorecard.get("security_score", report.get("security_score", "N/A"))
+            report["average_cvss"] = scorecard.get("average_cvss", report.get("average_cvss", "N/A"))
+        except Exception:
+            pass
+        return report
+
     def upload_and_scan(self, apk_path: str, poll_interval: int = 3) -> dict:
         upload_result = self.upload(apk_path)
         file_name = upload_result["file_name"]
@@ -56,7 +66,7 @@ class MobSFClient:
             report = self.get_report(hash)
             if report.get("app_name"):
                 report["_cached"] = True
-                return report
+                return self._merge_scorecard(report, hash)
         except requests.HTTPError:
             pass
 
@@ -67,7 +77,7 @@ class MobSFClient:
             try:
                 report = self.get_report(hash)
                 if report.get("app_name"):
-                    return report
+                    return self._merge_scorecard(report, hash)
             except requests.HTTPError:
                 pass
             time.sleep(poll_interval)

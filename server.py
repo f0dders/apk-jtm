@@ -367,16 +367,44 @@ async def run_scan(
         full_report = "".join(ai_chunks)
 
         import reporter
+
+        # Fetch app icon from MobSF (APK scan path only; best-effort)
+        icon_b64 = None
+        if not report_path and app_info.get("md5"):
+            try:
+                from mobsf_client import MobSFClient
+                icon_client = MobSFClient(
+                    env.get("MOBSF_URL", "http://localhost:8000"),
+                    env.get("MOBSF_API_KEY", ""),
+                )
+                icon_b64 = icon_client.fetch_icon_b64(app_info["md5"])
+            except Exception:
+                pass
+
+        def _label(item) -> str:
+            if isinstance(item, dict):
+                return (item.get("title") or item.get("name") or item.get("description") or str(item))[:80]
+            return str(item)[:80]
+
         app_meta = {
             **app_info,
             "security_score": extracted["security_score"],
             "average_cvss": extracted["average_cvss"],
             "dangerous_perms_count": len(extracted["dangerous_permissions"]),
+            "dangerous_perms_list": [
+                p["name"].replace("android.permission.", "")
+                for p in extracted["dangerous_permissions"]
+            ],
             "trackers_count": len(extracted["trackers"]),
+            "trackers_list": [_label(t) for t in extracted["trackers"]],
             "domains_count": extracted["network"]["domains"]["count"],
+            "domains_list": extracted["network"]["domains"]["all"][:20],
             "secrets_count": len(extracted["secrets"]),
+            "secrets_list": [_label(s) for s in extracted["secrets"][:15]],
             "code_issues_count": len(extracted["code_issues"]),
+            "code_issues_list": [i.get("title", "")[:60] for i in extracted["code_issues"][:15]],
             "manifest_issues_count": len(extracted["manifest_issues"]),
+            "icon_b64": icon_b64,
         }
         report_html_path = reporter.save_report(app_meta, full_report, str(REPORTS_DIR))
 

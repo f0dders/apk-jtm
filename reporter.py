@@ -46,10 +46,18 @@ def _score_ring_svg(score: int, colour: str) -> str:
 </svg>"""
 
 
-def _chip(icon: str, label: str, level: str = "") -> str:
-    """level: '' | 'warn' | 'danger'"""
+def _chip(icon: str, label: str, items: list, level: str = "") -> str:
+    """Renders a stat chip. If items are provided, wraps in <details> for expand/collapse."""
     cls = f"chip {level}".strip()
-    return f'<span class="{cls}"><span class="chip-icon">{icon}</span>{label}</span>'
+    if not items:
+        return f'<span class="{cls}"><span class="chip-icon">{icon}</span>{label}</span>'
+    items_html = "".join(f"<li>{_esc(str(item))}</li>" for item in items)
+    return (
+        f'<details class="{cls}">'
+        f'<summary><span class="chip-icon">{icon}</span>{label}</summary>'
+        f'<ul class="chip-list">{items_html}</ul>'
+        f'</details>'
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -71,6 +79,17 @@ body {
   box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.05);
 }
 .score-ring { flex-shrink: 0; }
+.app-icon-wrap { flex-shrink: 0; }
+.app-icon {
+  width: 72px; height: 72px; border-radius: 16px; object-fit: cover;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+}
+.app-icon-placeholder {
+  width: 72px; height: 72px; border-radius: 16px;
+  background: #f3f4f6; border: 1px solid #e5e7eb;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 2em;
+}
 .header-body { flex: 1; min-width: 0; }
 .app-name {
   font-size: 1.55em; font-weight: 800; color: #111827;
@@ -92,17 +111,52 @@ body {
 .risk-critical { background: #ffe4e6; color: #881337; }
 
 /* ── Stat chips ── */
-.stat-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
-.chip {
+.stat-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; align-items: flex-start; }
+
+/* Plain span chip */
+span.chip {
   display: inline-flex; align-items: center; gap: 5px;
   padding: 5px 11px; border-radius: 8px;
   background: #f9fafb; border: 1px solid #e5e7eb;
   font-size: 0.82em; font-weight: 500; color: #374151;
   white-space: nowrap;
 }
-.chip.warn    { background: #fff7ed; border-color: #fed7aa; color: #c2410c; }
-.chip.danger  { background: #fef2f2; border-color: #fecaca; color: #dc2626; }
-.chip-icon    { font-size: 1em; line-height: 1; }
+span.chip.warn    { background: #fff7ed; border-color: #fed7aa; color: #c2410c; }
+span.chip.danger  { background: #fef2f2; border-color: #fecaca; color: #dc2626; }
+
+/* Expandable details chip */
+details.chip {
+  border-radius: 8px; border: 1px solid #e5e7eb;
+  background: #f9fafb; font-size: 0.82em; font-weight: 500; color: #374151;
+}
+details.chip.warn   { background: #fff7ed; border-color: #fed7aa; color: #c2410c; }
+details.chip.danger { background: #fef2f2; border-color: #fecaca; color: #dc2626; }
+details.chip > summary {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 5px 11px; white-space: nowrap;
+  list-style: none; cursor: pointer; user-select: none;
+}
+details.chip > summary::-webkit-details-marker { display: none; }
+details.chip > summary::after { content: " ▾"; font-size: 0.8em; opacity: 0.6; }
+details.chip[open] > summary::after { content: " ▴"; }
+details.chip[open] {
+  width: 100%;
+  padding-bottom: 10px;
+}
+details.chip[open] > summary { font-weight: 600; }
+.chip-list {
+  list-style: none; padding: 0 12px; margin: 4px 0 0;
+  display: flex; flex-wrap: wrap; gap: 4px;
+}
+.chip-list li {
+  background: rgba(0,0,0,0.06); padding: 2px 8px; border-radius: 4px;
+  font-size: 0.88em; font-weight: 400;
+  font-family: 'SF Mono','Fira Code',monospace;
+}
+details.chip.warn   .chip-list li { background: rgba(194,65,12,0.08); }
+details.chip.danger .chip-list li { background: rgba(220,38,38,0.08); }
+
+.chip-icon { font-size: 1em; line-height: 1; }
 
 /* ── Meta strip ── */
 .meta-strip {
@@ -244,6 +298,13 @@ def _build_html(app_info: dict, ai_report: str, timestamp: str) -> str:
     chips       = _build_chips(app_info)
     dt          = datetime.strptime(timestamp, "%Y%m%d_%H%M%S").strftime("%d %b %Y, %H:%M")
 
+    icon_b64 = app_info.get("icon_b64")
+    icon_html = (
+        f'<img src="data:image/png;base64,{icon_b64}" alt="App icon" class="app-icon">'
+        if icon_b64 else
+        '<div class="app-icon-placeholder">📱</div>'
+    )
+
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -256,6 +317,7 @@ def _build_html(app_info: dict, ai_report: str, timestamp: str) -> str:
 
 <div class="report-header">
   <div class="score-ring">{ring_svg}</div>
+  <div class="app-icon-wrap">{icon_html}</div>
   <div class="header-body">
     <div class="app-name">{_esc(app_info.get('name', 'Unknown'))}</div>
     <div class="app-package">{_esc(app_info.get('package', ''))}</div>
@@ -295,23 +357,23 @@ def _build_chips(app_info: dict) -> str:
 
     perms = app_info.get("dangerous_perms_count", 0)
     level = "danger" if perms > 8 else "warn" if perms > 3 else ""
-    chips.append(_chip("🔒", f"{perms} Dangerous Perms", level))
+    chips.append(_chip("🔒", f"{perms} Dangerous Perms", app_info.get("dangerous_perms_list", []), level))
 
     trackers = app_info.get("trackers_count", 0)
     level = "danger" if trackers > 5 else "warn" if trackers > 2 else ""
-    chips.append(_chip("📡", f"{trackers} Trackers", level))
+    chips.append(_chip("📡", f"{trackers} Trackers", app_info.get("trackers_list", []), level))
 
     domains = app_info.get("domains_count", 0)
     level = "warn" if domains > 30 else ""
-    chips.append(_chip("🌐", f"{domains} Domains", level))
+    chips.append(_chip("🌐", f"{domains} Domains", app_info.get("domains_list", []), level))
 
     secrets = app_info.get("secrets_count", 0)
     level = "danger" if secrets > 5 else "warn" if secrets > 0 else ""
-    chips.append(_chip("🔑", f"{secrets} Secrets", level))
+    chips.append(_chip("🔑", f"{secrets} Secrets", app_info.get("secrets_list", []), level))
 
     issues = app_info.get("code_issues_count", 0)
     level = "danger" if issues > 10 else "warn" if issues > 3 else ""
-    chips.append(_chip("⚠️", f"{issues} Code Issues", level))
+    chips.append(_chip("⚠️", f"{issues} Code Issues", app_info.get("code_issues_list", []), level))
 
     cvss = app_info.get("average_cvss")
     if cvss and str(cvss).lower() not in ("none", "n/a", "0", "0.0", ""):
@@ -320,7 +382,7 @@ def _build_chips(app_info: dict) -> str:
             level = "danger" if cvss_f >= 7 else "warn" if cvss_f >= 4 else ""
         except (ValueError, TypeError):
             level = ""
-        chips.append(_chip("📊", f"CVSS {cvss}", level))
+        chips.append(_chip("📊", f"CVSS {cvss}", [], level))
 
     return "\n".join(chips)
 

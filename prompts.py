@@ -99,7 +99,7 @@ Do you recognise this app? State clearly:
 If you do not recognise the app at all, say so plainly. This section should give the reader crucial context before they see the findings.
 
 ## Executive Summary
-2–3 sentences. State what the app does and give an overall risk verdict in bold: **CRITICAL**, **HIGH**, **MEDIUM**, or **LOW**. This verdict must account for both the static analysis findings AND the app's known reputation and purpose — a trusted open-source tool with expected system permissions should not be rated the same as an unknown app with the same permissions.
+2–3 sentences. State what the app does and give an overall risk verdict in bold: **CRITICAL**, **HIGH**, **MEDIUM**, or **LOW**. This verdict must account for both the static analysis findings AND the app's known reputation and purpose — a trusted open-source tool with expected system permissions should not be rated the same as an unknown app with the same permissions. If your contextual verdict differs from the raw MobSF score (e.g. the score is 62 but the app is trusted), explicitly note this and explain why in one sentence.
 
 ## Top Security Findings
 The most significant issues in descending priority. For each, use this format:

@@ -56,6 +56,22 @@ class MobSFClient:
             pass
         return report
 
+    def fetch_icon_b64(self, md5: str) -> str | None:
+        """Fetch the app icon from MobSF and return it as a base64 string, or None on failure."""
+        import base64
+        try:
+            r = requests.get(
+                f"{self.url}/api/v1/icon",
+                params={"hash": md5, "sample_type": "apk"},
+                headers=self.headers,
+                timeout=5,
+            )
+            if r.status_code == 200 and r.headers.get("content-type", "").startswith("image/"):
+                return base64.b64encode(r.content).decode()
+        except Exception:
+            pass
+        return None
+
     def upload_and_scan(self, apk_path: str, poll_interval: int = 3) -> dict:
         upload_result = self.upload(apk_path)
         file_name = upload_result["file_name"]

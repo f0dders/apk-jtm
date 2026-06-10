@@ -691,41 +691,46 @@ async function loadHistory() {
 }
 
 function reportCard(r) {
-  const appName   = r.app_name  || r.name.replace('report_','').replace('.html','').replace(/_(\d{8}_\d{6})$/,'').replace(/_/g,'.');
-  const version   = r.version   ? `v${r.version}` : '';
-  const score     = r.score     ?? null;
-  const riskLabel = r.risk_label || '';
-  const riskCls   = r.risk_cls  || '';
-  const date      = new Date(r.modified * 1000);
-  const dateStr   = date.toLocaleDateString(undefined, { day:'numeric', month:'short', year:'numeric' });
-  const timeStr   = date.toLocaleTimeString(undefined, { hour:'2-digit', minute:'2-digit' });
-  const size      = `${(r.size/1024).toFixed(0)} KB`;
+  const appName = r.app_name || r.name.replace('report_','').replace('.html','').replace(/_(\d{8}_\d{6})$/,'').replace(/_/g,'.');
+  const version = r.version ? `v${r.version}` : '';
+  const score   = r.score ?? null;
+  const date    = new Date(r.modified * 1000);
+  const dateStr = date.toLocaleDateString(undefined, { day:'numeric', month:'short', year:'numeric' });
+  const size    = `${(r.size/1024).toFixed(0)} KB`;
 
   const scoreEl = score !== null
     ? `<div class="card-score" style="color:${scoreColour(score)}">${score}<span class="card-score-denom">/100</span></div>`
     : `<div class="card-score card-score-na">N/A</div>`;
 
-  const badgeEl = riskLabel
-    ? `<span class="risk-badge-sm risk-${riskCls}">${riskLabel}</span>`
+  // Action verdict — the one thing users need to see
+  const verdictMap = {
+    LOW:      { label: '✓ Safe to use',       cls: 'safe'    },
+    MEDIUM:   { label: '⚠ Use with caution',  cls: 'caution' },
+    HIGH:     { label: '⚠ Review carefully',  cls: 'review'  },
+    CRITICAL: { label: '✗ Avoid',             cls: 'avoid'   },
+  };
+  const vKey    = (r.ai_verdict || '').toUpperCase();
+  const vInfo   = verdictMap[vKey];
+  const verdictEl = vInfo
+    ? `<span class="card-verdict card-verdict-${vInfo.cls}">${vInfo.label}</span>`
+    : (r.risk_label ? `<span class="card-verdict card-verdict-unrated">${r.risk_label}</span>` : '');
+
+  // Plain-English summary — AI-generated or permission fallback
+  const summaryText = r.ai_summary || r.perms_summary || '';
+  const summaryEl = summaryText ? `<div class="card-summary">${summaryText}</div>` : '';
+
+  // Tracker warning — only show if non-zero
+  const trackerEl = (r.trackers > 0)
+    ? `<div class="card-tracker-warn">⚠ ${r.trackers} tracker${r.trackers > 1 ? 's' : ''} detected</div>`
     : '';
 
-  const verdictColours = { LOW: '#10b981', MEDIUM: '#f59e0b', HIGH: '#ef4444', CRITICAL: '#be123c' };
-  const verdictEl = r.ai_verdict ? (() => {
-    const v      = r.ai_verdict.toUpperCase();
-    const label  = r.ai_verdict_label || (v[0] + v.slice(1).toLowerCase() + ' Risk');
-    const colour = verdictColours[v] || '#9ca3af';
-    return `<span class="card-ai-verdict" style="border-color:${colour};color:${colour}">AI: ${label}</span>`;
-  })() : '';
-
-  const permsEl  = r.perms    != null ? `<span class="card-chip">🔒 ${r.perms} perms</span>` : '';
-  const trackEl  = r.trackers != null ? `<span class="card-chip">📡 ${r.trackers} trackers</span>` : '';
-
+  // Model tier
   const tierColours = { frontier: '#10b981', capable: '#3b82f6', basic: '#f59e0b', unknown: '#9ca3af' };
   const tierEl = r.ai_model ? (() => {
     const tier   = r.ai_model_tier || 'unknown';
     const label  = r.ai_tier_label || 'Unknown';
     const colour = tierColours[tier] || '#9ca3af';
-    const modelDisplay = r.ai_model.length > 36 ? r.ai_model.slice(0, 34) + '\u2026' : r.ai_model;
+    const modelDisplay = r.ai_model.length > 36 ? r.ai_model.slice(0, 34) + '…' : r.ai_model;
     return `<div class="card-model"><span class="card-tier-badge" style="background:${colour}">${label}</span><span class="card-model-name">${modelDisplay}</span></div>`;
   })() : '';
 
@@ -735,8 +740,10 @@ function reportCard(r) {
       <div class="card-body">
         <div class="card-title">${appName} <span class="card-version">${version}</span></div>
         <div class="card-package">${r.package || ''}</div>
-        <div class="card-chips">${badgeEl}${verdictEl}${permsEl}${trackEl}</div>
-        <div class="card-date">${dateStr} at ${timeStr} · ${size}</div>
+        ${verdictEl}
+        ${summaryEl}
+        ${trackerEl}
+        <div class="card-date">${dateStr} · ${size}</div>
         ${tierEl}
       </div>
       <div class="card-actions" onclick="event.stopPropagation()">

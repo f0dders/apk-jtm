@@ -373,9 +373,16 @@ async def run_scan(
             full_report_raw, _re.IGNORECASE | _re.MULTILINE
         )
         ai_verdict = verdict_match.group(1).upper() if verdict_match else None
-        # Strip the tag line from the rendered report
+
+        summary_match = _re.search(
+            r'^SUMMARY:\s*(.+)$',
+            full_report_raw, _re.IGNORECASE | _re.MULTILINE
+        )
+        ai_summary = summary_match.group(1).strip() if summary_match else None
+
+        # Strip both tag lines from the rendered report
         full_report = _re.sub(
-            r'\n*^VERDICT:\s*(LOW|MEDIUM|HIGH|CRITICAL)\s*$\n*',
+            r'\n*^(VERDICT:\s*(LOW|MEDIUM|HIGH|CRITICAL)|SUMMARY:\s*.+)\s*$\n*',
             '', full_report_raw, flags=_re.IGNORECASE | _re.MULTILINE
         ).strip()
 
@@ -419,10 +426,12 @@ async def run_scan(
             "code_issues_list": [i.get("title", "")[:60] for i in extracted["code_issues"][:15]],
             "manifest_issues_count": len(extracted["manifest_issues"]),
             "icon_b64": icon_b64,
-            "ai_provider": provider_name,
-            "ai_model": provider.model,
+            "ai_provider":  provider_name,
+            "ai_model":     provider.model,
             "ai_model_tier": _classify_model(provider.model),
-            "ai_verdict": ai_verdict,
+            "ai_verdict":   ai_verdict,
+            "ai_summary":   ai_summary,
+            "perms_summary": _perms_plain(extracted["dangerous_permissions"]),
         }
         report_html_path = reporter.save_report(app_meta, full_report, str(REPORTS_DIR))
 
@@ -434,6 +443,58 @@ async def run_scan(
 
     except Exception as e:
         send("error", {"message": f"Unexpected error: {e}"})
+
+
+_PERM_PLAIN = {
+    # Severe / alarming
+    "BIND_DEVICE_ADMIN":           "full device administration",
+    "BIND_ACCESSIBILITY_SERVICE":  "full device control via accessibility",
+    "SYSTEM_ALERT_WINDOW":         "overlays other apps",
+    # High power
+    "REQUEST_INSTALL_PACKAGES":    "installs other apps",
+    "MANAGE_EXTERNAL_STORAGE":     "manages all your files",
+    # Privacy-sensitive comms
+    "READ_SMS":                    "reads your messages",
+    "SEND_SMS":                    "sends messages",
+    "PROCESS_OUTGOING_CALLS":      "monitors your calls",
+    "CALL_PHONE":                  "makes phone calls",
+    "READ_CALL_LOG":               "reads call history",
+    # Identity / accounts
+    "READ_CONTACTS":               "reads your contacts",
+    "WRITE_CONTACTS":              "edits your contacts",
+    "GET_ACCOUNTS":                "accesses your accounts",
+    "READ_PHONE_STATE":            "reads phone identity",
+    # Location
+    "ACCESS_BACKGROUND_LOCATION":  "tracks location in background",
+    "ACCESS_FINE_LOCATION":        "tracks your precise location",
+    "ACCESS_COARSE_LOCATION":      "tracks your location",
+    # Sensors / media
+    "CAMERA":                      "uses your camera",
+    "RECORD_AUDIO":                "uses your microphone",
+    "USE_BIOMETRIC":               "uses fingerprint/face ID",
+    "USE_FINGERPRINT":             "uses fingerprint",
+    "BODY_SENSORS":                "reads body sensors",
+    "ACTIVITY_RECOGNITION":        "tracks physical activity",
+    # Storage / media
+    "READ_MEDIA_IMAGES":           "reads your photos",
+    "READ_MEDIA_VIDEO":            "reads your videos",
+    "READ_MEDIA_AUDIO":            "reads your audio",
+    "READ_EXTERNAL_STORAGE":       "reads your files",
+    "WRITE_EXTERNAL_STORAGE":      "writes to your files",
+}
+
+
+def _perms_plain(dangerous_perms: list) -> str:
+    """Return a short plain-English summary of the most significant permissions."""
+    seen = []
+    for p in dangerous_perms:
+        name = p.get("name", "").replace("android.permission.", "")
+        label = _PERM_PLAIN.get(name)
+        if label and label not in seen:
+            seen.append(label)
+        if len(seen) >= 3:
+            break
+    return ", ".join(seen) if seen else ""
 
 
 def _poll_report(client, hash: str):

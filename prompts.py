@@ -150,9 +150,11 @@ Unambiguous list of anything that suggests malicious behaviour, spyware, or dang
 - Be direct: if something is genuinely dangerous, say it is; if it is not, say that too
 - Use plain English throughout — briefly explain any technical terms
 
-**Finally — write this as the absolute last line of your response, nothing after it:**
+**Finally — write these two lines as the absolute last two lines of your response, nothing after them:**
 VERDICT: LOW
-(Replace LOW with your contextual verdict: LOW, MEDIUM, HIGH, or CRITICAL. This must reflect your reasoned assessment, not the raw MobSF score.)
+SUMMARY: One sentence in plain, non-technical English that a non-technical person can immediately understand. What does this app do with the user's data, and should they be concerned? No jargon, no permission names, no abbreviations. Example: "This is a trusted open-source app store — it needs to download and install apps on your behalf, which is exactly what it's designed to do."
+(Replace LOW with your contextual verdict: LOW, MEDIUM, HIGH, or CRITICAL.)
+(Replace the SUMMARY line text with your own one-sentence plain-English summary.)
 """
 
     return prompt_body

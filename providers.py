@@ -177,8 +177,11 @@ class OpenRouterProvider:
         self.api_key = api_key
 
     def stream(self, prompt: str) -> Iterator[str]:
-        from openai import OpenAI
+        from openai import OpenAI, RateLimitError
         import httpx
+        import time
+        import json as _json
+
         client = OpenAI(
             base_url="https://openrouter.ai/api/v1",
             api_key=self.api_key,
@@ -188,16 +191,38 @@ class OpenRouterProvider:
                 "X-Title": "APK Security Analyser",
             },
         )
-        stream = client.chat.completions.create(
-            model=self.model,
-            messages=[{"role": "user", "content": prompt}],
-            stream=True,
-            temperature=0.2,
-        )
-        for chunk in stream:
-            content = chunk.choices[0].delta.content
-            if content:
-                yield content
+
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                stream = client.chat.completions.create(
+                    model=self.model,
+                    messages=[{"role": "user", "content": prompt}],
+                    stream=True,
+                    temperature=0.2,
+                )
+                for chunk in stream:
+                    content = chunk.choices[0].delta.content
+                    if content:
+                        yield content
+                return
+            except RateLimitError as e:
+                # Extract retry_after from OpenRouter's metadata if present
+                wait = 35  # safe default
+                try:
+                    body = _json.loads(e.response.text)
+                    wait = int(body["error"]["metadata"].get("retry_after_seconds", 35)) + 2
+                except Exception:
+                    pass
+                if attempt < max_retries - 1:
+                    yield f"\n\n⏳ Rate limited by upstream provider — retrying in {wait}s (attempt {attempt + 1}/{max_retries})…\n\n"
+                    time.sleep(wait)
+                else:
+                    raise RuntimeError(
+                        f"Rate limited after {max_retries} attempts. "
+                        "The free-tier model is under heavy load — try again in a few minutes, "
+                        "or switch to a paid model or a different provider."
+                    ) from e
 
 
 def build_provider(

@@ -40,13 +40,21 @@ Download from **https://www.docker.com/products/docker-desktop** and install it.
 
 Open a Terminal (Mac/Linux) or Command Prompt (Windows) and run:
 
+**Mac / Linux:**
 ```
-docker run -d --name mobsf -p 8000:8000 -v mobsf_data:/home/mobsf/.MobSF opensecurity/mobile-security-framework-mobsf:latest
+mkdir -p ~/.mobsf
+docker run -d --name mobsf -p 8000:8000 -v ~/.mobsf:/home/mobsf/.MobSF opensecurity/mobile-security-framework-mobsf:latest
+```
+
+**Windows:**
+```
+mkdir %USERPROFILE%\.mobsf
+docker run -d --name mobsf -p 8000:8000 -v %USERPROFILE%\.mobsf:/home/mobsf/.MobSF opensecurity/mobile-security-framework-mobsf:latest
 ```
 
 MobSF will download on first run (~1–2 GB) and then start in the background. After 30–60 seconds, open **http://localhost:8000** in your browser to confirm it's running.
 
-> **Why the `-v` flag?** This mounts a persistent volume so MobSF keeps its database — including your API key and scan history — every time it restarts. Without it, the API key changes on every restart and all scan history is lost.
+> **Why the `-v` flag?** This bind-mounts a local folder (`~/.mobsf`) into the container so MobSF's database — including your API key and scan history — persists across restarts. Using a named Docker volume instead causes a permissions error because Docker creates it owned by root, which MobSF can't write to.
 
 #### 2c — Get your MobSF API key
 

@@ -79,8 +79,9 @@ if ! command -v docker &>/dev/null; then
 else
   if ! curl -s --max-time 3 http://localhost:8000 &>/dev/null; then
     echo -e "  ${CYAN}Starting MobSF (Docker)...${RESET}"
+    mkdir -p "$HOME/.mobsf"
     docker run -d --name mobsf -p 8000:8000 \
-      -v mobsf_data:/home/mobsf/.MobSF \
+      -v "$HOME/.mobsf:/home/mobsf/.MobSF" \
       opensecurity/mobile-security-framework-mobsf 2>/dev/null \
       || docker start mobsf 2>/dev/null \
       || true

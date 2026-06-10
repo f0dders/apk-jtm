@@ -319,7 +319,12 @@ async def run_scan(
             while True:
                 kind, value = await asyncio.wait_for(chunk_queue.get(), timeout=120)
                 if kind == "error":
-                    send("error", {"message": f"AI analysis failed: {value}"})
+                    is_rate_limit = "rate limit" in value.lower() or "rate limited" in value.lower() or "429" in value
+                    send("error", {
+                        "message": f"AI analysis failed: {value}",
+                        "type": "rate_limit" if is_rate_limit else "error",
+                        "provider": provider_name,
+                    })
                     feed_task.cancel()
                     return
                 if kind == "done":
@@ -327,7 +332,11 @@ async def run_scan(
                 send("analysis", value)
                 ai_chunks.append(value)
         except asyncio.TimeoutError:
-            send("error", {"message": "AI analysis timed out after 2 minutes — the model may be busy or the model name is wrong."})
+            send("error", {
+                "message": "AI analysis timed out after 2 minutes — the model may be busy or the model name is wrong.",
+                "type": "timeout",
+                "provider": provider_name,
+            })
             feed_task.cancel()
             return
 

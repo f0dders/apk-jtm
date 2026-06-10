@@ -516,21 +516,28 @@ function streamProgress(scanId) {
 
   evtSource.addEventListener('error', e => {
     let msg = 'Unknown error';
-    try { msg = JSON.parse(e.data).message; } catch {}
+    let errType = 'error';
+    let provider = '';
+    try {
+      const d = JSON.parse(e.data);
+      msg = d.message;
+      errType = d.type || 'error';
+      provider = d.provider || '';
+    } catch {}
     evtSource.close();
     stopAnalysisTimer();
-
-    // Make timeout errors more helpful
-    if (msg.includes('timed out') || msg.includes('timeout')) {
-      msg += ' Try a smaller/faster model — for OpenRouter, <code>meta-llama/llama-3.3-70b-instruct:free</code> is a good free option.';
-    }
 
     const errEl = document.createElement('div');
     errEl.className = 'stage error';
     errEl.innerHTML = `<span class="stage-icon">✕</span><span class="stage-label">Error</span><span class="stage-msg">${msg}</span>`;
     stagesEl.appendChild(errEl);
     terminal.textContent += `\n\nError: ${msg.replace(/<[^>]+>/g, '')}`;
-    toast('Analysis failed — see error above', 'err');
+
+    if (errType === 'rate_limit' || errType === 'timeout') {
+      stagesEl.appendChild(buildModelSuggestions(provider));
+    }
+
+    toast('Analysis failed — see suggestions below', 'err');
   });
 }
 
@@ -549,6 +556,85 @@ function renderMetaCard(data) {
       <div class="meta-item"><div class="meta-label">Dangerous Perms</div><div class="meta-value ${data.dangerous_perms > 5 ? 'score-crit' : data.dangerous_perms > 2 ? 'score-warn' : ''}">${data.dangerous_perms}</div></div>
     </div>
   `;
+}
+
+// ─── Model suggestions after rate limit / timeout ─────────────────────────────
+const SUGGESTED_MODELS = [
+  { slug: 'meta-llama/llama-3.3-70b-instruct:free', label: 'Llama 3.3 70B', note: 'Fast · Free · OpenRouter' },
+  { slug: 'google/gemma-3-12b-it:free',             label: 'Gemma 3 12B',   note: 'Lightweight · Free · OpenRouter' },
+  { slug: 'mistralai/mistral-7b-instruct:free',     label: 'Mistral 7B',    note: 'Reliable · Free · OpenRouter' },
+  { slug: 'deepseek/deepseek-r1-0528:free',         label: 'DeepSeek R1',   note: 'Strong reasoning · Free · OpenRouter' },
+];
+
+function buildModelSuggestions(provider) {
+  const wrap = document.createElement('div');
+  wrap.className = 'model-suggestions';
+
+  const title = document.createElement('div');
+  title.className = 'model-suggestions-title';
+  title.textContent = '💡 Try a different model — click to switch and re-run:';
+  wrap.appendChild(title);
+
+  const grid = document.createElement('div');
+  grid.className = 'model-suggestions-grid';
+
+  // If provider is openrouter, show free alternatives; otherwise suggest openrouter or groq
+  const suggestions = provider === 'openrouter'
+    ? SUGGESTED_MODELS
+    : [
+        { slug: 'meta-llama/llama-3.3-70b-instruct:free', label: 'Switch to OpenRouter (free)', note: 'openrouter.ai' },
+        { slug: 'llama-3.3-70b-versatile', label: 'Switch to Groq (free)', note: 'Very fast · console.groq.com' },
+      ];
+
+  suggestions.forEach(({ slug, label, note }) => {
+    const btn = document.createElement('button');
+    btn.className = 'model-suggestion-btn';
+    btn.innerHTML = `<span class="suggestion-label">${label}</span><span class="suggestion-note">${note}</span>`;
+    btn.onclick = () => retryWithModel(provider, slug, btn, wrap);
+    grid.appendChild(btn);
+  });
+
+  wrap.appendChild(grid);
+  return wrap;
+}
+
+async function retryWithModel(provider, modelSlug, btn, wrap) {
+  // Disable all buttons to prevent double-clicks
+  wrap.querySelectorAll('button').forEach(b => b.disabled = true);
+  btn.innerHTML = `<span class="suggestion-label">Saving…</span>`;
+
+  // Save the new model to config
+  const key = provider === 'openrouter' ? 'OPENROUTER_MODEL'
+    : provider === 'groq' ? 'GROQ_MODEL'
+    : provider === 'mistral' ? 'MISTRAL_MODEL'
+    : provider === 'ollama' ? 'OLLAMA_MODEL'
+    : null;
+
+  if (key) {
+    try { await api('/api/config', { method: 'POST', body: { [key]: modelSlug } }); } catch {}
+  }
+
+  // Re-run scan with the chosen model passed as an override
+  if (!state.scanFile && !state.reportFile) {
+    toast('Original file no longer available — please re-upload', 'err');
+    return;
+  }
+
+  const form = new FormData();
+  if (state.scanFile) form.append('apk', state.scanFile);
+  if (state.reportFile) form.append('report_json', state.reportFile);
+  form.append('model_override', modelSlug);
+
+  try {
+    const res = await fetch('/api/scan/upload', { method: 'POST', body: form });
+    if (!res.ok) throw new Error(await res.text());
+    const { scan_id } = await res.json();
+    state.scanId = scan_id;
+    setView('progress');
+    streamProgress(scan_id);
+  } catch (err) {
+    toast(`Failed to restart scan: ${err.message}`, 'err');
+  }
 }
 
 function viewReport() {

@@ -182,6 +182,16 @@ select option { background: var(--surface2); }
 .stage-label { flex: 1; }
 .stage-msg { color: var(--text-muted); font-size: 12px; }
 
+/* Model suggestions */
+.model-suggestions { margin-top: 12px; padding: 14px 16px; background: rgba(74,222,128,0.05); border: 1px solid rgba(74,222,128,0.15); border-radius: 10px; }
+.model-suggestions-title { font-size: 13px; color: var(--text-muted); margin-bottom: 10px; }
+.model-suggestions-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+.model-suggestion-btn { display: flex; flex-direction: column; align-items: flex-start; padding: 8px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; cursor: pointer; transition: border-color 0.15s, background 0.15s; }
+.model-suggestion-btn:hover:not(:disabled) { border-color: var(--accent); background: rgba(74,222,128,0.08); }
+.model-suggestion-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.suggestion-label { font-size: 13px; font-weight: 600; color: var(--text); }
+.suggestion-note { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
 /* App meta card */
 .meta-grid {
   display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px;

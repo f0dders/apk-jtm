@@ -94,6 +94,8 @@ select option { background: var(--surface2); }
 .field { margin-bottom: 18px; }
 .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .field-hint { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+.info-box { font-size: 13px; color: var(--text-muted); background: rgba(74,222,128,0.07); border: 1px solid rgba(74,222,128,0.2); border-radius: 8px; padding: 10px 14px; margin-top: 4px; line-height: 1.5; }
+.info-box code { background: rgba(255,255,255,0.08); padding: 1px 5px; border-radius: 4px; font-size: 12px; }
 
 /* Wizard */
 #wizard { max-width: 600px; margin: 0 auto; }
@@ -175,6 +177,7 @@ select option { background: var(--surface2); }
 .stage.active { border-color: var(--accent); background: var(--accent-dim); }
 .stage.done { border-color: rgba(45,198,83,0.3); }
 .stage.error { border-color: rgba(224,82,96,0.4); background: rgba(224,82,96,0.08); }
+.stage.error .stage-msg code { background: rgba(255,255,255,0.1); padding: 1px 5px; border-radius: 4px; font-size: 11px; }
 .stage-icon { width: 20px; text-align: center; flex-shrink: 0; }
 .stage-label { flex: 1; }
 .stage-msg { color: var(--text-muted); font-size: 12px; }

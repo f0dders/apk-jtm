@@ -238,7 +238,10 @@ function renderWizardStep() {
         <div class="field">
           <label>Model</label>
           <input id="wiz-openrouter-model" type="text" value="${cfg.openrouter_model || DEFAULT_MODELS.openrouter}">
-          <div class="field-hint">Use any model slug, e.g: anthropic/claude-opus-4-8 · openai/gpt-4o · meta-llama/llama-3.3-70b-instruct</div>
+          <div class="field-hint">Use the full <code>provider/model</code> slug from openrouter.ai/models, e.g. <code>anthropic/claude-sonnet-4-6</code> · <code>openai/gpt-4o</code> · <code>meta-llama/llama-3.3-70b-instruct:free</code></div>
+        </div>
+        <div class="info-box">
+          ⏱ <strong>Free-tier models can be slow.</strong> Large models (200B+) may take 2–5 minutes to respond, or time out under heavy load. For reliable speed, try <code>meta-llama/llama-3.3-70b-instruct:free</code> or a paid model.
         </div>
       `;
     }
@@ -442,6 +445,26 @@ function streamProgress(scanId) {
 
   const evtSource = new EventSource(`/api/scan/${scanId}/stream`);
   let analysisStarted = false;
+  let analysisTimer = null;
+  let analysisSeconds = 0;
+
+  function startAnalysisTimer() {
+    analysisSeconds = 0;
+    analysisTimer = setInterval(() => {
+      analysisSeconds++;
+      const el = stages['analysis'];
+      if (!el) return;
+      const msgEl = el.querySelector('.stage-msg');
+      let hint = `${analysisSeconds}s elapsed`;
+      if (analysisSeconds >= 20) hint += ' — large models can take 2–5 min';
+      if (analysisSeconds >= 90) hint += '. Still waiting…';
+      msgEl.textContent = hint;
+    }, 1000);
+  }
+
+  function stopAnalysisTimer() {
+    if (analysisTimer) { clearInterval(analysisTimer); analysisTimer = null; }
+  }
 
   evtSource.addEventListener('progress', e => {
     const data = JSON.parse(e.data);
@@ -459,6 +482,7 @@ function streamProgress(scanId) {
       if (!analysisStarted) {
         analysisStarted = true;
         show('progress-terminal-wrap');
+        startAnalysisTimer();
       }
     } else {
       const el = stages[stage];
@@ -471,7 +495,9 @@ function streamProgress(scanId) {
       analysisStarted = true;
       show('progress-terminal-wrap');
       getOrCreateStage('analysis');
+      startAnalysisTimer();
     }
+    stopAnalysisTimer();
     terminal.textContent += e.data;
     terminal.scrollTop = terminal.scrollHeight;
   });
@@ -479,6 +505,7 @@ function streamProgress(scanId) {
   evtSource.addEventListener('complete', e => {
     const data = JSON.parse(e.data);
     evtSource.close();
+    stopAnalysisTimer();
     markStageDone('analysis', 'Complete');
     Object.keys(stages).forEach(k => markStageDone(k));
     state.reportUrl = data.report_url;
@@ -491,12 +518,19 @@ function streamProgress(scanId) {
     let msg = 'Unknown error';
     try { msg = JSON.parse(e.data).message; } catch {}
     evtSource.close();
+    stopAnalysisTimer();
+
+    // Make timeout errors more helpful
+    if (msg.includes('timed out') || msg.includes('timeout')) {
+      msg += ' Try a smaller/faster model — for OpenRouter, <code>meta-llama/llama-3.3-70b-instruct:free</code> is a good free option.';
+    }
+
     const errEl = document.createElement('div');
     errEl.className = 'stage error';
     errEl.innerHTML = `<span class="stage-icon">✕</span><span class="stage-label">Error</span><span class="stage-msg">${msg}</span>`;
     stagesEl.appendChild(errEl);
-    terminal.textContent += `\n\nError: ${msg}`;
-    toast(msg, 'err');
+    terminal.textContent += `\n\nError: ${msg.replace(/<[^>]+>/g, '')}`;
+    toast('Analysis failed — see error above', 'err');
   });
 }
 

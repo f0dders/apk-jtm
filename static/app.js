@@ -109,8 +109,10 @@ function renderWizardStep() {
       </div>
       <div class="field">
         <label>MobSF API Key</label>
-        <input id="wiz-mobsf-key" type="password" placeholder="Paste your API key from MobSF → REST API">
-        <div class="field-hint">Find it at http://localhost:8000 → top-right menu → REST API</div>
+        <input id="wiz-mobsf-key" type="password"
+               value="${state.config.mobsf_key_set ? '••••••••' : ''}"
+               placeholder="Paste your API key from MobSF → REST API">
+        <div class="field-hint">${state.config.mobsf_key_set ? '✓ Key saved — leave blank to keep existing key.' : 'Find it at http://localhost:8000 → top-right menu → REST API'}</div>
       </div>
     `;
   }

@@ -181,15 +181,32 @@ body {
 # ---------------------------------------------------------------------------
 
 def save_report(app_info: dict, ai_report: str, output_dir: str = ".") -> str:
+    import json as _json
+
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     package = app_info.get("package", "unknown").replace(".", "_")
     filename = f"report_{package}_{timestamp}"
 
     md_path   = Path(output_dir) / f"{filename}.md"
     html_path = Path(output_dir) / f"{filename}.html"
+    meta_path = Path(output_dir) / f"{filename}.meta.json"
 
     md_path.write_text(_build_markdown(app_info, ai_report, timestamp))
     html_path.write_text(_build_html(app_info, ai_report, timestamp))
+
+    score = _parse_score(app_info.get("security_score", 0))
+    risk_label, risk_cls, _ = _risk(score)
+    meta_path.write_text(_json.dumps({
+        "app_name":    app_info.get("name", "Unknown"),
+        "package":     app_info.get("package", ""),
+        "version":     app_info.get("version", ""),
+        "score":       score,
+        "risk_label":  risk_label,
+        "risk_cls":    risk_cls,
+        "timestamp":   timestamp,
+        "perms":       app_info.get("dangerous_perms_count", 0),
+        "trackers":    app_info.get("trackers_count", 0),
+    }, indent=2))
 
     return str(html_path)
 

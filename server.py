@@ -131,13 +131,37 @@ async def list_ollama_models():
 async def list_reports():
     reports = []
     for path in sorted(REPORTS_DIR.glob("report_*.html"), key=lambda p: p.stat().st_mtime, reverse=True):
+        meta = {}
+        meta_path = path.with_suffix("").with_suffix(".meta.json")
+        if meta_path.exists():
+            try:
+                meta = json.loads(meta_path.read_text())
+            except Exception:
+                pass
         reports.append({
-            "name": path.name,
-            "size": path.stat().st_size,
-            "modified": path.stat().st_mtime,
-            "url": f"/reports/{path.name}",
+            "name":      path.name,
+            "size":      path.stat().st_size,
+            "modified":  path.stat().st_mtime,
+            "url":       f"/reports/{path.name}",
+            **meta,
         })
     return {"reports": reports}
+
+
+@app.delete("/api/reports/{filename}")
+async def delete_report(filename: str):
+    if ".." in filename or "/" in filename:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+    deleted = []
+    for ext in (".html", ".md", ".meta.json"):
+        stem = filename.removesuffix(".html")
+        p = REPORTS_DIR / f"{stem}{ext}"
+        if p.exists():
+            p.unlink()
+            deleted.append(p.name)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Report not found")
+    return {"deleted": deleted}
 
 
 # ---------------------------------------------------------------------------

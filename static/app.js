@@ -654,29 +654,108 @@ function viewReport() {
 }
 
 // ─── History ──────────────────────────────────────────────────────────────────
+// ─── Reports / History ───────────────────────────────────────────────────────
+
 async function loadHistory() {
   const list = $('report-list');
   list.innerHTML = '<div class="text-muted text-sm">Loading...</div>';
   try {
     const { reports } = await api('/api/reports');
+
+    // Update nav badge
+    const badge = $('report-count-badge');
+    if (badge) {
+      if (reports.length) {
+        badge.textContent = reports.length;
+        badge.classList.remove('hidden');
+      } else {
+        badge.classList.add('hidden');
+      }
+    }
+
     if (!reports.length) {
-      list.innerHTML = '<div class="text-muted text-sm">No reports yet.</div>';
+      list.innerHTML = `
+        <div class="reports-empty">
+          <img src="/static/logo.png" alt="APK-JTM" class="empty-logo">
+          <div class="empty-title">No reports yet</div>
+          <div class="empty-sub">Drop an APK on the scan screen to generate your first security report.</div>
+          <button class="btn-primary" onclick="setView('scan')" style="margin-top:20px">+ New Scan</button>
+        </div>`;
       return;
     }
-    list.innerHTML = reports.map(r => `
-      <div class="report-item">
-        <div>
-          <div class="report-name">${r.name.replace('report_','').replace('.html','').replace(/_/g,' ')}</div>
-          <div class="report-meta">${new Date(r.modified * 1000).toLocaleString()} · ${(r.size/1024).toFixed(0)} KB</div>
-        </div>
-        <div class="report-actions">
-          <button class="btn-icon" onclick="openReport('${r.url}')">Open</button>
-          <a href="${r.url}" download class="btn-icon" style="text-decoration:none;display:inline-flex;align-items:center;padding:7px 10px">↓</a>
-        </div>
-      </div>
-    `).join('');
+
+    list.innerHTML = reports.map(r => reportCard(r)).join('');
   } catch {
     list.innerHTML = '<div class="text-muted text-sm">Failed to load reports.</div>';
+  }
+}
+
+function reportCard(r) {
+  const appName   = r.app_name  || r.name.replace('report_','').replace('.html','').replace(/_(\d{8}_\d{6})$/,'').replace(/_/g,'.');
+  const version   = r.version   ? `v${r.version}` : '';
+  const score     = r.score     ?? null;
+  const riskLabel = r.risk_label || '';
+  const riskCls   = r.risk_cls  || '';
+  const date      = new Date(r.modified * 1000);
+  const dateStr   = date.toLocaleDateString(undefined, { day:'numeric', month:'short', year:'numeric' });
+  const timeStr   = date.toLocaleTimeString(undefined, { hour:'2-digit', minute:'2-digit' });
+  const size      = `${(r.size/1024).toFixed(0)} KB`;
+
+  const scoreEl = score !== null
+    ? `<div class="card-score" style="color:${scoreColour(score)}">${score}<span class="card-score-denom">/100</span></div>`
+    : `<div class="card-score card-score-na">N/A</div>`;
+
+  const badgeEl = riskLabel
+    ? `<span class="risk-badge-sm risk-${riskCls}">${riskLabel}</span>`
+    : '';
+
+  const permsEl  = r.perms    != null ? `<span class="card-chip">🔒 ${r.perms} perms</span>` : '';
+  const trackEl  = r.trackers != null ? `<span class="card-chip">📡 ${r.trackers} trackers</span>` : '';
+
+  return `
+    <div class="report-card" onclick="openReport('${r.url}')">
+      <div class="card-score-wrap">${scoreEl}</div>
+      <div class="card-body">
+        <div class="card-title">${appName} <span class="card-version">${version}</span></div>
+        <div class="card-package">${r.package || ''}</div>
+        <div class="card-chips">${badgeEl}${permsEl}${trackEl}</div>
+        <div class="card-date">${dateStr} at ${timeStr} · ${size}</div>
+      </div>
+      <div class="card-actions" onclick="event.stopPropagation()">
+        <button class="btn-icon" title="Open" onclick="openReport('${r.url}')">↗</button>
+        <a href="${r.url}" download class="btn-icon" title="Download" style="text-decoration:none;display:inline-flex;align-items:center;justify-content:center;padding:7px 10px">↓</a>
+        <button class="btn-icon btn-delete" title="Delete" onclick="deleteReport('${r.name}', this)">🗑</button>
+      </div>
+    </div>`;
+}
+
+function scoreColour(score) {
+  if (score >= 80) return '#10b981';
+  if (score >= 60) return '#f59e0b';
+  if (score >= 40) return '#ef4444';
+  return '#be123c';
+}
+
+async function deleteReport(name, btn) {
+  if (!confirm(`Delete this report? This cannot be undone.`)) return;
+  btn.disabled = true;
+  btn.textContent = '…';
+  try {
+    await api(`/api/reports/${encodeURIComponent(name)}`, { method: 'DELETE' });
+    // Remove card from DOM immediately
+    btn.closest('.report-card').remove();
+    // Update badge
+    const remaining = document.querySelectorAll('.report-card').length;
+    const badge = $('report-count-badge');
+    if (badge) {
+      if (remaining) { badge.textContent = remaining; }
+      else { badge.classList.add('hidden'); loadHistory(); }
+    }
+    toast('Report deleted', 'ok');
+  } catch {
+    btn.disabled = false;
+    btn.textContent = '🗑';
+    toast('Failed to delete report', 'err');
   }
 }
 

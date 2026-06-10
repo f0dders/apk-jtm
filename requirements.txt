@@ -9,6 +9,7 @@ aiofiles>=23.2.1
 requests>=2.31.0
 rich>=13.7.0
 python-dotenv>=1.0.0
+markdown>=3.6
 
 # Local providers
 ollama>=0.1.7

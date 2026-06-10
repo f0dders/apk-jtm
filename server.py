@@ -343,7 +343,17 @@ async def run_scan(
         full_report = "".join(ai_chunks)
 
         import reporter
-        app_meta = {**app_info, "security_score": extracted["security_score"], "average_cvss": extracted["average_cvss"]}
+        app_meta = {
+            **app_info,
+            "security_score": extracted["security_score"],
+            "average_cvss": extracted["average_cvss"],
+            "dangerous_perms_count": len(extracted["dangerous_permissions"]),
+            "trackers_count": len(extracted["trackers"]),
+            "domains_count": extracted["network"]["domains"]["count"],
+            "secrets_count": len(extracted["secrets"]),
+            "code_issues_count": len(extracted["code_issues"]),
+            "manifest_issues_count": len(extracted["manifest_issues"]),
+        }
         report_html_path = reporter.save_report(app_meta, full_report, str(REPORTS_DIR))
 
         send("complete", {

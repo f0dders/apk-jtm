@@ -72,6 +72,7 @@ else
     echo -e "  ${CYAN}Starting MobSF (Docker)...${RESET}"
     docker start mobsf 2>/dev/null \
       || docker run -d --name mobsf -p 8000:8000 \
+           -v mobsf_data:/home/mobsf/.MobSF \
            opensecurity/mobile-security-framework-mobsf 2>/dev/null \
       || true
     echo -e "  ${GREEN}✓${RESET} MobSF starting at http://localhost:8000"

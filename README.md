@@ -41,18 +41,12 @@ Download from **https://www.docker.com/products/docker-desktop** and install it.
 Open a Terminal (Mac/Linux) or Command Prompt (Windows) and run:
 
 ```
-docker run -it --rm -p 8000:8000 opensecurity/mobile-security-framework-mobsf:latest
+docker run -d --name mobsf -p 8000:8000 -v mobsf_data:/home/mobsf/.MobSF opensecurity/mobile-security-framework-mobsf:latest
 ```
 
-MobSF will download on first run (~1–2 GB) and then start. You'll see a line like:
+MobSF will download on first run (~1–2 GB) and then start in the background. After 30–60 seconds, open **http://localhost:8000** in your browser to confirm it's running.
 
-```
-* Running on http://0.0.0.0:8000
-```
-
-Once you see that, open **http://localhost:8000** in your browser to confirm it's running.
-
-> **Tip:** MobSF takes 30–60 seconds to fully start. If the page doesn't load immediately, wait a moment and refresh.
+> **Why the `-v` flag?** This mounts a persistent volume so MobSF keeps its database — including your API key and scan history — every time it restarts. Without it, the API key changes on every restart and all scan history is lost.
 
 #### 2c — Get your MobSF API key
 
@@ -61,19 +55,15 @@ Once you see that, open **http://localhost:8000** in your browser to confirm it'
 3. Select **REST API**
 4. Copy the API key shown — you'll paste this into the app's setup wizard
 
-> The API key is the same every time MobSF starts, so you only need to copy it once.
+> Your API key stays the same across restarts as long as you use the volume flag above. You only need to copy it once.
 
 #### Keeping MobSF running
 
-You need MobSF running whenever you want to scan a new APK. To stop it, press `Ctrl+C` in the terminal where it's running. To restart it, run the same `docker run` command above.
+To stop MobSF: `docker stop mobsf`
 
-**Shortcut for repeat use** — to run MobSF in the background (so it doesn't occupy a terminal window):
+To start it again: `docker start mobsf`
 
-```
-docker run -d --name mobsf -p 8000:8000 opensecurity/mobile-security-framework-mobsf:latest
-```
-
-Then to stop it: `docker stop mobsf` and to start it again: `docker start mobsf`
+The launcher script (`Start - Mac.command` / `Start - Windows.bat` / `Start - Linux.sh`) handles this automatically — it starts MobSF if it's not already running each time you launch the app.
 
 > If you already have MobSF running elsewhere, or just want to analyse an existing MobSF JSON report without scanning, you can skip this step entirely.
 

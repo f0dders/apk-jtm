@@ -85,7 +85,7 @@ if %errorlevel% neq 0 (
     echo.
 ) else (
     echo   Starting MobSF via Docker...
-    docker start mobsf >nul 2>&1 || docker run -d --name mobsf -p 8000:8000 opensecurity/mobile-security-framework-mobsf >nul 2>&1
+    docker start mobsf >nul 2>&1 || docker run -d --name mobsf -p 8000:8000 -v mobsf_data:/home/mobsf/.MobSF opensecurity/mobile-security-framework-mobsf >nul 2>&1
     echo   [OK] MobSF available at http://localhost:8000
     echo.
 )

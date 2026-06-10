@@ -105,7 +105,7 @@ function renderWizardStep() {
       <div class="field">
         <label>MobSF URL</label>
         <input id="wiz-mobsf-url" type="text" value="${state.config.mobsf_url || 'http://localhost:8000'}" placeholder="http://localhost:8000">
-        <div class="field-hint">Run MobSF with Docker: <code>docker run -it -p 8000:8000 opensecurity/mobile-security-framework-mobsf</code></div>
+        <div class="field-hint">Run MobSF with Docker: <code>docker run -d --name mobsf -p 8000:8000 -v mobsf_data:/home/mobsf/.MobSF opensecurity/mobile-security-framework-mobsf</code> — the <code>-v</code> flag keeps your API key and scan history across restarts</div>
       </div>
       <div class="field">
         <label>MobSF API Key</label>

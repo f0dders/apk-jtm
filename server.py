@@ -1,3 +1,7 @@
+# APK-JTM — Copyright (C) 2026 f0dders
+# This program is free software: you can redistribute it and/or modify it
+# under the terms of the GNU General Public License v3 as published by the
+# Free Software Foundation. See the LICENSE file for details.
 """
 FastAPI web server. Handles:
   - Static file serving

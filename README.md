@@ -181,3 +181,11 @@ Close the terminal window that opened when you launched the app. MobSF (Docker) 
 **Mac Gatekeeper warning** — right-click `Start - Mac.command` → Open → Open. One-time step.
 
 **Windows "Python not found"** — reinstall Python from python.org and make sure "Add Python to PATH" is ticked.
+
+---
+
+## Licence
+
+Copyright (C) 2026 f0dders
+
+This project is licensed under the [GNU General Public License v3.0](LICENSE). You are free to use, modify and distribute it, but any derivative work must also be open source under the same licence. Commercial use requires separate written permission from the author.

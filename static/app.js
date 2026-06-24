@@ -818,7 +818,7 @@ function reportCard(r, appNameOverride, isOlder = false) {
     ? `<button class="btn-icon btn-rerun" title="Re-analyse with a different AI model" onclick="event.stopPropagation();showRerun('${r.name}', this)">⟳</button>`
     : '';
 
-  // APKiD badge — shows result whenever APKiD ran (clean or flagged)
+  // APKiD pill — only shown when something was flagged (warnings earn their place)
   let apkidEl = '';
   if (r.apkid_available) {
     if (r.apkid_malware_packer) {
@@ -827,16 +827,23 @@ function reportCard(r, appNameOverride, isOlder = false) {
       apkidEl = `<span class="card-apkid card-apkid-warn" title="APKiD detected this APK has been packed or obfuscated">📦 Packed</span>`;
     } else if (r.apkid_anti_vm) {
       apkidEl = `<span class="card-apkid card-apkid-info" title="App detects virtual environments — may not run on emulators or test devices">🕵️ Anti-emulator</span>`;
-    } else {
-      apkidEl = `<span class="card-apkid card-apkid-clean" title="APKiD: no packers, obfuscators, or evasion techniques detected — the app was built with a standard toolchain">✅ Clean build</span>`;
     }
+    // Clean APKiD result needs no badge — covered by the single green verdict pill below
   }
+
+  // Consolidated status: single green pill when everything is clear,
+  // otherwise show verdict + any APKiD warnings separately
+  const apkidAllClear = r.apkid_available && !r.apkid_packer && !r.apkid_anti_vm && !r.apkid_malware_packer;
+  const allClear = vKey === 'LOW' && (apkidAllClear || !r.apkid_available);
+  const statusEl = allClear
+    ? `<span class="card-verdict card-verdict-safe">✓ Safe to use</span>`
+    : `${verdictEl}${apkidEl}`;
 
   // Older runs: collapsed single-row view
   if (isOlder) {
     return `
       <div class="report-card report-card-collapsed" onclick="openReport('${r.url}')">
-        <div class="collapsed-verdict">${verdictEl}${apkidEl}</div>
+        <div class="collapsed-verdict">${statusEl}</div>
         <div class="collapsed-model">${tierEl}</div>
         <div class="collapsed-date">${dateStr}</div>
         <div class="card-actions" onclick="event.stopPropagation()">
@@ -853,7 +860,7 @@ function reportCard(r, appNameOverride, isOlder = false) {
       <div class="card-body">
         <div class="card-title">${appName} <span class="card-version">${version}</span></div>
         <div class="card-package">${r.package || ''}</div>
-        ${verdictEl}${apkidEl}
+        ${statusEl}
         ${summaryEl}
         ${trackerEl}
         <div class="card-date">${dateStr} · ${size}</div>

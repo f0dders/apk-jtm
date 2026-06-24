@@ -48,14 +48,24 @@ def run_apkid(apk_path: str, timeout: int = 60) -> dict:
 
 def _parse(raw: dict) -> dict:
     """Flatten per-DEX APKiD results into a single risk-oriented summary."""
-    files = raw.get("files", {})
+    files = raw.get("files", [])
+
+    # APKiD 2.1.x outputs files as a list of {filename, results} objects.
+    # Older builds used a dict keyed by filename — handle both.
+    if isinstance(files, dict):
+        entries = [{"filename": k, "results": v} for k, v in files.items()]
+    else:
+        entries = files  # already a list
 
     merged: dict[str, set] = {}
-    for _dex_name, dex_data in files.items():
-        # APKiD 2.x: findings at top level OR nested under "results"
-        findings = dex_data if "compiler" in dex_data else dex_data.get("results", dex_data)
+    for entry in entries:
+        # Findings may be at top level or nested under "results"
+        dex_data = entry if isinstance(entry, dict) else {}
+        findings = dex_data.get("results", dex_data)
+        if not isinstance(findings, dict):
+            continue
         for category, items in findings.items():
-            if items:
+            if items and isinstance(items, list):
                 merged.setdefault(category, set()).update(items)
 
     packers     = sorted(merged.get("packer", []))

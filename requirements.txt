@@ -20,4 +20,6 @@ anthropic>=0.28.0
 google-generativeai>=0.7.0
 
 # Supplemental analysis tools
-apkid>=2.1.0          # packer/obfuscator/compiler fingerprinting (optional but recommended)
+# apkid is installed separately by the launcher (optional — requires native build tools;
+# may fail on Python 3.14+ until upstream yara-python-dex adds wheels for it)
+# To install manually: pip install apkid

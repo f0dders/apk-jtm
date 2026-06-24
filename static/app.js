@@ -653,7 +653,6 @@ function viewReport() {
   setView('report');
 }
 
-// ─── History ──────────────────────────────────────────────────────────────────
 // ─── Reports / History ───────────────────────────────────────────────────────
 
 async function loadHistory() {
@@ -684,14 +683,43 @@ async function loadHistory() {
       return;
     }
 
-    list.innerHTML = reports.map(r => reportCard(r)).join('');
+    // Group by package name, preserving newest-first order within each group
+    const groups = {};
+    const groupOrder = [];
+    for (const r of reports) {
+      const key = r.package || r.name;
+      if (!groups[key]) { groups[key] = []; groupOrder.push(key); }
+      groups[key].push(r);
+    }
+
+    list.innerHTML = groupOrder.map(key => reportGroup(groups[key])).join('');
   } catch {
     list.innerHTML = '<div class="text-muted text-sm">Failed to load reports.</div>';
   }
 }
 
-function reportCard(r) {
-  const appName = r.app_name || r.name.replace('report_','').replace('.html','').replace(/_(\d{8}_\d{6})$/,'').replace(/_/g,'.');
+function reportGroup(runs) {
+  const latest = runs[0]; // already sorted newest-first from API
+  const appName = latest.app_name || latest.name.replace('report_','').replace('.html','').replace(/_(\d{8}_\d{6})$/,'').replace(/_/g,'.');
+
+  // If only one run, render a plain card (no group wrapper overhead)
+  if (runs.length === 1) {
+    return `<div class="report-group">${reportCard(runs[0], appName)}</div>`;
+  }
+
+  const cards = runs.map((r, i) => reportCard(r, appName, i > 0)).join('');
+  return `
+    <div class="report-group report-group-multi">
+      <div class="group-header">
+        <span class="group-app-name">${appName}</span>
+        <span class="group-run-count">${runs.length} analyses</span>
+      </div>
+      ${cards}
+    </div>`;
+}
+
+function reportCard(r, appNameOverride, isOlder = false) {
+  const appName = appNameOverride || r.app_name || r.name.replace('report_','').replace('.html','').replace(/_(\d{8}_\d{6})$/,'').replace(/_/g,'.');
   const version = r.version ? `v${r.version}` : '';
   const score   = r.score ?? null;
   const date    = new Date(r.modified * 1000);
@@ -702,7 +730,6 @@ function reportCard(r) {
     ? `<div class="card-score" style="color:${scoreColour(score)}">${score}<span class="card-score-denom">/100</span></div>`
     : `<div class="card-score card-score-na">N/A</div>`;
 
-  // Action verdict — the one thing users need to see
   const verdictMap = {
     LOW:      { label: '✓ Safe to use',       cls: 'safe'    },
     MEDIUM:   { label: '⚠ Use with caution',  cls: 'caution' },
@@ -715,16 +742,13 @@ function reportCard(r) {
     ? `<span class="card-verdict card-verdict-${vInfo.cls}">${vInfo.label}</span>`
     : (r.risk_label ? `<span class="card-verdict card-verdict-unrated">${r.risk_label}</span>` : '');
 
-  // Plain-English summary — AI-generated or permission fallback
   const summaryText = r.ai_summary || r.perms_summary || '';
   const summaryEl = summaryText ? `<div class="card-summary">${summaryText}</div>` : '';
 
-  // Tracker warning — only show if non-zero
   const trackerEl = (r.trackers > 0)
     ? `<div class="card-tracker-warn">⚠ ${r.trackers} tracker${r.trackers > 1 ? 's' : ''} detected</div>`
     : '';
 
-  // Model tier
   const tierColours = { frontier: '#10b981', capable: '#3b82f6', basic: '#f59e0b', unknown: '#9ca3af' };
   const tierEl = r.ai_model ? (() => {
     const tier   = r.ai_model_tier || 'unknown';
@@ -734,8 +758,15 @@ function reportCard(r) {
     return `<div class="card-model"><span class="card-tier-badge" style="background:${colour}">${label}</span><span class="card-model-name">${modelDisplay}</span></div>`;
   })() : '';
 
+  // Re-run button — only shown when a MobSF hash is stored
+  const rerunBtn = r.md5
+    ? `<button class="btn-icon btn-rerun" title="Re-analyse with a different AI model" onclick="event.stopPropagation();showRerun('${r.name}', this)">⟳</button>`
+    : '';
+
+  const olderClass = isOlder ? ' card-older' : '';
+
   return `
-    <div class="report-card" onclick="openReport('${r.url}')">
+    <div class="report-card${olderClass}" onclick="openReport('${r.url}')">
       <div class="card-score-wrap">${scoreEl}</div>
       <div class="card-body">
         <div class="card-title">${appName} <span class="card-version">${version}</span></div>
@@ -749,9 +780,95 @@ function reportCard(r) {
       <div class="card-actions" onclick="event.stopPropagation()">
         <button class="btn-icon" title="Open" onclick="openReport('${r.url}')">↗</button>
         <a href="${r.url}" download class="btn-icon" title="Download" style="text-decoration:none;display:inline-flex;align-items:center;justify-content:center;padding:7px 10px">↓</a>
+        ${rerunBtn}
         <button class="btn-icon btn-delete" title="Delete" onclick="deleteReport('${r.name}', this)">🗑</button>
       </div>
     </div>`;
+}
+
+// ─── Re-run panel ─────────────────────────────────────────────────────────────
+
+function showRerun(filename, triggerBtn) {
+  // Close any open re-run panel first
+  document.querySelectorAll('.rerun-panel').forEach(p => p.remove());
+  document.querySelectorAll('.btn-rerun.active').forEach(b => b.classList.remove('active'));
+
+  const card = triggerBtn.closest('.report-card');
+  triggerBtn.classList.add('active');
+
+  const cfg = state.config;
+  const provider = cfg.provider || 'ollama';
+  const modelKey = {
+    ollama: 'ollama_model', lmstudio: 'lmstudio_model', claude: 'claude_model',
+    openai: 'openai_model', gemini: 'gemini_model', groq: 'groq_model',
+    mistral: 'mistral_model', openrouter: 'openrouter_model',
+  }[provider];
+  const currentModel = (modelKey && cfg[modelKey]) || '';
+  const providerLabel = PROVIDERS.find(p => p.id === provider)?.name || provider;
+
+  const panel = document.createElement('div');
+  panel.className = 'rerun-panel';
+  panel.innerHTML = `
+    <div class="rerun-title">Re-analyse with a different AI model</div>
+    <div class="rerun-body">
+      <div class="rerun-current">Currently using <strong>${providerLabel}</strong> — <span class="rerun-model-name">${currentModel || 'default model'}</span></div>
+      <div class="rerun-fields">
+        <div class="field" style="margin:0">
+          <label style="font-size:11px">Model override <span style="color:var(--text-muted);font-weight:400">(leave blank to use your saved model)</span></label>
+          <input id="rerun-model-input" type="text" placeholder="${currentModel || 'e.g. gemma4:27b'}" style="font-size:12px;padding:6px 10px">
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button class="btn-primary" style="font-size:12px;padding:7px 16px" onclick="startRerun('${filename}', this)">Run analysis</button>
+          <button class="btn-secondary" style="font-size:12px;padding:7px 12px" onclick="closeRerun(this)">Cancel</button>
+        </div>
+      </div>
+      <div class="rerun-hint">To use a different provider, go to Settings first. The re-analysis uses your current provider (${providerLabel}) and does not need the original APK file — MobSF already has the scan data.</div>
+    </div>
+  `;
+
+  card.insertAdjacentElement('afterend', panel);
+}
+
+function closeRerun(btn) {
+  const panel = btn.closest('.rerun-panel');
+  if (panel) panel.remove();
+  document.querySelectorAll('.btn-rerun.active').forEach(b => b.classList.remove('active'));
+}
+
+async function startRerun(filename, btn) {
+  const panel = btn.closest('.rerun-panel');
+  const modelInput = panel.querySelector('#rerun-model-input')?.value?.trim();
+  const cfg = state.config;
+
+  btn.disabled = true;
+  btn.textContent = 'Starting…';
+
+  try {
+    const payload = {
+      provider: cfg.provider || 'ollama',
+      model: modelInput || null,
+    };
+    const res = await fetch(`/api/reports/${encodeURIComponent(filename)}/rerun`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: res.statusText }));
+      throw new Error(err.detail || res.statusText);
+    }
+    const { scan_id } = await res.json();
+    panel.remove();
+    state.scanId = scan_id;
+    state.scanFile = null;
+    state.reportFile = null;
+    setView('progress');
+    streamProgress(scan_id);
+  } catch (e) {
+    btn.disabled = false;
+    btn.textContent = 'Run analysis';
+    toast(`Re-run failed: ${e.message}`, 'err');
+  }
 }
 
 function scoreColour(score) {

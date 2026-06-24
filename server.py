@@ -168,6 +168,43 @@ async def delete_report(filename: str):
     return {"deleted": deleted}
 
 
+@app.post("/api/reports/{filename}/rerun")
+async def rerun_report(filename: str, payload: dict, background_tasks: BackgroundTasks):
+    """Re-analyse an existing report with a different AI provider/model."""
+    if ".." in filename or "/" in filename:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+
+    stem = filename.removesuffix(".html")
+    meta_path = REPORTS_DIR / f"{stem}.meta.json"
+    if not meta_path.exists():
+        raise HTTPException(status_code=404, detail="Report metadata not found")
+
+    try:
+        meta = json.loads(meta_path.read_text())
+    except Exception:
+        raise HTTPException(status_code=500, detail="Could not read report metadata")
+
+    md5 = meta.get("md5")
+    if not md5:
+        raise HTTPException(status_code=400, detail="No MobSF hash stored for this report — cannot re-run without the original APK")
+
+    scan_id = str(uuid.uuid4())
+    queue: asyncio.Queue = asyncio.Queue()
+    _scan_queues[scan_id] = queue
+
+    background_tasks.add_task(
+        run_scan,
+        scan_id=scan_id,
+        apk_path=None,
+        report_path=None,
+        provider_override=payload.get("provider"),
+        model_override=payload.get("model"),
+        mobsf_hash=md5,
+    )
+
+    return {"scan_id": scan_id}
+
+
 # ---------------------------------------------------------------------------
 # Scanning
 # ---------------------------------------------------------------------------
@@ -246,6 +283,7 @@ async def run_scan(
     report_path: str | None,
     provider_override: str | None,
     model_override: str | None,
+    mobsf_hash: str | None = None,
 ):
     queue = _scan_queues.get(scan_id)
     if not queue:
@@ -276,6 +314,22 @@ async def run_scan(
             send("progress", {"stage": "loading", "message": "Loading MobSF report..."})
             raw_report = json.loads(Path(report_path).read_text())
             send("progress", {"stage": "loading", "message": "Report loaded."})
+        elif mobsf_hash:
+            mobsf_url = env.get("MOBSF_URL", "http://localhost:8000")
+            mobsf_key = env.get("MOBSF_API_KEY", "")
+            if not mobsf_key:
+                send("error", {"message": "MOBSF_API_KEY not configured. Open Settings to add it."})
+                return
+            send("progress", {"stage": "loading", "message": "Fetching scan data from MobSF..."})
+            from mobsf_client import MobSFClient
+            client = MobSFClient(mobsf_url, mobsf_key)
+            try:
+                raw_report = await asyncio.to_thread(client.get_report, mobsf_hash)
+                raw_report = await asyncio.to_thread(client._merge_scorecard, raw_report, mobsf_hash)
+            except Exception as e:
+                send("error", {"message": f"MobSF error fetching cached scan: {e}"})
+                return
+            send("progress", {"stage": "loading", "message": "Scan data loaded from MobSF ⚡"})
         else:
             mobsf_url = env.get("MOBSF_URL", "http://localhost:8000")
             mobsf_key = env.get("MOBSF_API_KEY", "")
@@ -393,7 +447,7 @@ async def run_scan(
         import reporter
         from model_tier import classify as _classify_model
 
-        # Fetch app icon from MobSF (APK scan path only; best-effort)
+        # Fetch app icon from MobSF (best-effort; works for APK scans and re-runs)
         icon_b64 = None
         if not report_path and app_info.get("md5"):
             try:

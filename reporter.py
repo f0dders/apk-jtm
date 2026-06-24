@@ -313,6 +313,7 @@ def save_report(app_info: dict, ai_report: str, output_dir: str = ".") -> str:
         "app_name":       app_info.get("name", "Unknown"),
         "package":        app_info.get("package", ""),
         "version":        app_info.get("version", ""),
+        "md5":            app_info.get("md5", ""),
         "score":          score,
         "risk_label":     risk_label,
         "risk_cls":       risk_cls,

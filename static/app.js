@@ -764,7 +764,7 @@ function reportCard(r, appNameOverride, isOlder = false) {
     ? `<button class="btn-icon btn-rerun" title="Re-analyse with a different AI model" onclick="event.stopPropagation();showRerun('${r.name}', this)">⟳</button>`
     : '';
 
-  // APKiD flag — only shown when APKiD ran and found something
+  // APKiD badge — shows result whenever APKiD ran (clean or flagged)
   let apkidEl = '';
   if (r.apkid_available) {
     if (r.apkid_malware_packer) {
@@ -772,7 +772,9 @@ function reportCard(r, appNameOverride, isOlder = false) {
     } else if (r.apkid_packer) {
       apkidEl = `<span class="card-apkid card-apkid-warn" title="APKiD detected this APK has been packed or obfuscated">📦 Packed</span>`;
     } else if (r.apkid_anti_vm) {
-      apkidEl = `<span class="card-apkid card-apkid-warn" title="APKiD detected anti-VM techniques — the app may behave differently under analysis">🕵️ Anti-VM</span>`;
+      apkidEl = `<span class="card-apkid card-apkid-info" title="App detects virtual environments — may not run on emulators or test devices">🕵️ Anti-emulator</span>`;
+    } else {
+      apkidEl = `<span class="card-apkid card-apkid-clean" title="APKiD: no packers, obfuscators, or evasion techniques detected">✅ No packers</span>`;
     }
   }
 

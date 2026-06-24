@@ -92,7 +92,7 @@ def build_analysis_prompt(extracted: dict) -> str:
             flag = " ⚠ SUSPICIOUS" if apkid.get("suspicious_obfuscator") else " (normal)"
             lines.append(f"- **Obfuscator(s):** {', '.join(apkid['obfuscators'])}{flag}")
         if apkid.get("anti_vm"):
-            lines.append(f"- **Anti-VM techniques:** {', '.join(apkid['anti_vm'])} ⚠ EVASION DETECTED")
+            lines.append(f"- **Anti-emulator techniques:** {', '.join(apkid['anti_vm'])} — app detects virtual environments (may refuse to run on emulators/test devices)")
         if apkid.get("anti_debug"):
             lines.append(f"- **Anti-debug/disassembly:** {', '.join(apkid['anti_debug'] + apkid.get('anti_disassembly', []))}")
         if apkid.get("abnormal"):
@@ -101,6 +101,9 @@ def build_analysis_prompt(extracted: dict) -> str:
             lines.append("- **Repackaging detected:** compiled via dex2jar, suggesting this APK was rebuilt from a JAR ⚠")
         if lines:
             sections.append("## Packer & Obfuscation Analysis (APKiD)\n" + "\n".join(lines))
+        else:
+            compiler = ", ".join(apkid.get("compilers", [])) or "standard toolchain"
+            sections.append(f"## Packer & Obfuscation Analysis (APKiD)\n- **Clean:** No packers, obfuscators, anti-VM, or anti-debug techniques detected. Compiler: {compiler}.")
     elif apkid.get("available") is False and not apkid.get("reason", "").startswith("APKiD not installed"):
         sections.append(f"## Packer & Obfuscation Analysis (APKiD)\n- APKiD scan failed: {apkid.get('reason', 'unknown error')}")
 
@@ -175,12 +178,18 @@ Where are this app's servers hosted, and what does that mean for user privacy? U
 3–5 bullet points.
 
 ## Packer & Obfuscation Analysis
-Only include this section if APKiD data is present above. Explain in plain English what the findings mean:
-- What a packer is and why legitimate apps rarely use them (they wrap the real code to prevent analysis)
-- Whether the detected packer is associated with malware tooling or is a standard commercial protector
-- What anti-VM or anti-debug techniques indicate (the app knows it's being watched and tries to behave differently)
-- Whether the compiler fingerprint is normal for the app type
-Keep this section brief — 2–4 bullet points. If APKiD data is not present, omit this section entirely.
+Only include this section if APKiD data is present above. Explain in plain English what the findings mean.
+
+**Verdict escalation rule (mandatory):** If APKiD detected a **known malware packer** (e.g. Bangcle, SecNeo, Jiagu, DexProtect), the overall verdict MUST be HIGH or CRITICAL regardless of other findings — these packers are used almost exclusively to hide malicious behaviour.
+
+Cover:
+- Whether a packer was found, what it is, and whether it is associated with malware or is a standard commercial code protector. Most legitimate consumer apps are NOT packed.
+- Anti-emulator/anti-VM techniques: note clearly that this means **the app may refuse to run on emulators or virtual devices** (e.g. during testing or security research). For banking or DRM apps this is normal; for unknown apps it warrants scrutiny.
+- Anti-debug techniques if present: the app resists reverse engineering, which is common in paid apps protecting IP but unusual in open-source or free apps.
+- Whether the compiler fingerprint is normal for this type of app.
+- If everything is clean: say so plainly — "No packers, obfuscators, or evasion techniques detected; standard compiler toolchain."
+
+Keep this section to 2–4 bullet points. If APKiD data is not present, omit this section entirely.
 
 ## Red Flags
 Unambiguous list of anything that suggests malicious behaviour, spyware, or dangerously poor security practice — **after accounting for the app's known purpose**. If the app is unknown or unverifiable, list that explicitly as a red flag. If nothing rises to this level, write one sentence: "No significant red flags identified."

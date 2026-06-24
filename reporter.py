@@ -497,7 +497,7 @@ def _build_chips(app_info: dict) -> str:
         elif packer_names:
             chips.append(_chip("📦", f"Packed: {', '.join(packer_names)}", [], "warn"))
         if apkid.get("has_anti_vm"):
-            chips.append(_chip("🕵️", "Anti-VM detected", apkid.get("anti_vm", []), "danger"))
+            chips.append(_chip("🕵️", "Anti-emulator", apkid.get("anti_vm", []), "warn"))
         if apkid.get("has_anti_debug"):
             items = apkid.get("anti_debug", []) + apkid.get("anti_disassembly", [])
             chips.append(_chip("🛡️", "Anti-debug detected", items, "warn"))

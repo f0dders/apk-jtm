@@ -95,7 +95,24 @@ def build_analysis_prompt(extracted: dict) -> str:
 
 ---
 
-Write a security report with exactly these six sections. Use `##` for section headings.
+**CRITICAL OUTPUT REQUIREMENT — read this first, before writing anything else:**
+Your response MUST end with exactly these two lines as the very last lines, with nothing after them:
+VERDICT: <LOW|MEDIUM|HIGH|CRITICAL>
+SUMMARY: <one plain-English sentence — no jargon, no permission names>
+
+Example of correct ending:
+VERDICT: HIGH
+SUMMARY: This app requests access to your location, contacts, and microphone but its purpose does not explain why, which is a serious privacy concern.
+
+Do not add any text, punctuation, or blank lines after the SUMMARY line. This is a machine-readable tag and must be exact.
+
+---
+
+**Unknown app rule:** If you do not recognise this app from your training data — no public record, no known developer, no verifiable open-source repository — treat it as potentially malicious by default. An unknown app with sensitive permissions should be rated **HIGH** or **CRITICAL** unless the static analysis findings are extremely clean. The burden of proof is on the app to appear trustworthy, not on the analyst to find evidence of harm.
+
+---
+
+Write a security report with exactly these seven sections. Use `##` for section headings.
 
 ## App Context & Reputation
 Do you recognise this app? State clearly:
@@ -104,10 +121,10 @@ Do you recognise this app? State clearly:
 - Its general reputation in the security and developer community (trusted, controversial, unknown, known malware, etc.)
 - Whether the permissions and behaviours flagged below are **expected for this type of app** or genuinely suspicious
 
-If you do not recognise the app at all, say so plainly. This section should give the reader crucial context before they see the findings.
+If you do not recognise the app at all, say so plainly and note that this alone increases the risk rating. This section should give the reader crucial context before they see the findings.
 
 ## Executive Summary
-2–3 sentences. State what the app does and give an overall risk verdict in bold: **CRITICAL**, **HIGH**, **MEDIUM**, or **LOW**. This verdict must account for both the static analysis findings AND the app's known reputation and purpose — a trusted open-source tool with expected system permissions should not be rated the same as an unknown app with the same permissions. If your contextual verdict differs from the raw MobSF score (e.g. the score is 62 but the app is trusted), explicitly note this and explain why in one sentence.
+2–3 sentences. State what the app does (or appears to do) and give an overall risk verdict in bold: **CRITICAL**, **HIGH**, **MEDIUM**, or **LOW**. This verdict must account for both the static analysis findings AND the app's known reputation and purpose — a trusted open-source tool with expected system permissions should not be rated the same as an unknown app with the same permissions. If your contextual verdict differs from the raw MobSF score, explicitly note this and explain why in one sentence.
 
 ## Top Security Findings
 The most significant issues in descending priority. For each, use this format:
@@ -134,7 +151,7 @@ Where are this app's servers hosted, and what does that mean for user privacy? U
 3–5 bullet points.
 
 ## Red Flags
-Unambiguous list of anything that suggests malicious behaviour, spyware, or dangerously poor security practice — **after accounting for the app's known purpose**. If nothing rises to this level, write one sentence: "No significant red flags identified."
+Unambiguous list of anything that suggests malicious behaviour, spyware, or dangerously poor security practice — **after accounting for the app's known purpose**. If the app is unknown or unverifiable, list that explicitly as a red flag. If nothing rises to this level, write one sentence: "No significant red flags identified."
 
 ## Verdict & Recommendations
 3–5 plain-English action items for someone deciding whether to install or allow this app. Factor in reputation. Start each with a strong verb (Install / Avoid / Remove / Monitor / Verify / Restrict).
@@ -150,11 +167,9 @@ Unambiguous list of anything that suggests malicious behaviour, spyware, or dang
 - Be direct: if something is genuinely dangerous, say it is; if it is not, say that too
 - Use plain English throughout — briefly explain any technical terms
 
-**Finally — write these two lines as the absolute last two lines of your response, nothing after them:**
-VERDICT: LOW
-SUMMARY: One sentence in plain, non-technical English that a non-technical person can immediately understand. What does this app do with the user's data, and should they be concerned? No jargon, no permission names, no abbreviations. Example: "This is a trusted open-source app store — it needs to download and install apps on your behalf, which is exactly what it's designed to do."
-(Replace LOW with your contextual verdict: LOW, MEDIUM, HIGH, or CRITICAL.)
-(Replace the SUMMARY line text with your own one-sentence plain-English summary.)
+**Reminder — your response MUST end with exactly these two lines, nothing after them:**
+VERDICT: <LOW|MEDIUM|HIGH|CRITICAL>
+SUMMARY: <one plain-English sentence>
 """
 
     return prompt_body

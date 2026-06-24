@@ -13,9 +13,10 @@ from typing import Iterator
 class OllamaProvider:
     name = "ollama"
 
-    def __init__(self, model: str, base_url: str = "http://localhost:11434"):
+    def __init__(self, model: str, base_url: str = "http://localhost:11434", num_ctx: int = 32768):
         self.model = model
         self.base_url = base_url
+        self.num_ctx = num_ctx
 
     def stream(self, prompt: str) -> Iterator[str]:
         import ollama
@@ -24,7 +25,7 @@ class OllamaProvider:
             model=self.model,
             messages=[{"role": "user", "content": prompt}],
             stream=True,
-            options={"temperature": 0.2, "num_ctx": 16384},
+            options={"temperature": 0.2, "num_ctx": self.num_ctx},
         ):
             content = chunk["message"]["content"]
             if content:
@@ -238,6 +239,7 @@ def build_provider(
         return OllamaProvider(
             model=model or env.get("OLLAMA_MODEL", "qwen2.5-coder:32b"),
             base_url=env.get("OLLAMA_URL", "http://localhost:11434"),
+            num_ctx=int(env.get("OLLAMA_NUM_CTX", 32768)),
         )
     if p == "lmstudio":
         return LMStudioProvider(

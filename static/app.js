@@ -512,16 +512,32 @@ function streamProgress(scanId) {
     terminal.scrollTop = terminal.scrollHeight;
   });
 
-  evtSource.addEventListener('complete', e => {
-    const data = JSON.parse(e.data);
-    evtSource.close();
+  let pendingComplete = null;
+
+  evtSource.addEventListener('analysis_done', () => {
     stopAnalysisTimer();
     markStageDone('analysis', 'Complete');
+    terminal.scrollTop = terminal.scrollHeight;
+    if (pendingComplete) finishScan(pendingComplete);
+  });
+
+  function finishScan(data) {
+    evtSource.close();
     Object.keys(stages).forEach(k => markStageDone(k));
     state.reportUrl = data.report_url;
     show('btn-view-report');
     hide('btn-cancel-scan');
     toast('Analysis complete', 'ok');
+  }
+
+  evtSource.addEventListener('complete', e => {
+    const data = JSON.parse(e.data);
+    if (stages['analysis'] && !stages['analysis'].classList.contains('done')) {
+      // analysis_done hasn't arrived yet — wait for it
+      pendingComplete = data;
+    } else {
+      finishScan(data);
+    }
   });
 
   evtSource.addEventListener('error', e => {

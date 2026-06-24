@@ -529,6 +529,7 @@ async def run_scan(
         }
         report_html_path = reporter.save_report(app_meta, full_report, str(REPORTS_DIR))
 
+        send("analysis_done", {})
         send("complete", {
             "message": "Analysis complete.",
             "report_url": f"/reports/{Path(report_html_path).name}",

@@ -4,7 +4,7 @@
 
 # APK-JTM — Just tell me if it's dodgy!
 
-[![Version](https://img.shields.io/badge/version-v1.4.0-4ade80?style=flat-square)](https://github.com/f0dders/apk-jtm/releases)
+[![Version](https://img.shields.io/badge/version-v1.5.0-4ade80?style=flat-square)](https://github.com/f0dders/apk-jtm/releases)
 [![Licence](https://img.shields.io/badge/licence-GPL%20v3-blue?style=flat-square)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue?style=flat-square)](https://www.python.org/downloads/)
 
@@ -139,7 +139,7 @@ On first visit, a 3-step wizard guides you through:
 2. **AI provider** — choose offline (Ollama or LM Studio) or cloud
 3. **Configure** — enter your model name or API key
 
-Settings are saved in a local `.env` file. Change them later via the ⚙ icon.
+Settings are saved to your user data directory. Change them later via the ⚙ icon.
 
 ---
 

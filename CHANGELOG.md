@@ -4,6 +4,21 @@ All notable changes are documented here. Versions follow [Semantic Versioning](h
 
 ---
 
+## [v1.5.0] — 2026-06-24
+
+### New features
+
+- **Platform-standard user data directory** — config (`.env`) and reports now live outside the app folder in the OS-standard location (`~/Library/Application Support/APK-JTM/` on Mac, `%APPDATA%\APK-JTM\` on Windows, `~/.local/share/apk-jtm/` on Linux). Existing installs are migrated automatically on first launch. Updates are now frictionless — `git pull` or replace the app folder and nothing needs to be copied.
+- **Update notifications** — the app checks GitHub releases on startup (once per session) and shows a dismissible banner if a newer version is available, with a "How to update" modal covering both Git and ZIP install paths.
+- **Version in Settings** — the ⚙ Settings panel now shows the current version and data directory path at the bottom.
+
+### Improvements
+
+- **Consolidated status pills on report cards** — when everything is clear (LOW verdict + no APKiD flags), a single green "✓ Safe to use" pill replaces the previous two-pill layout. Warning pills (Malware packer / Packed / Anti-emulator) only appear when APKiD flagged something — clean results earn no badge.
+- **Settings panel title** — shows "Settings" for returning users, "Welcome to APK-JTM" for first-time setup.
+
+---
+
 ## [v1.4.0] — 2026-06-24
 
 ### New features

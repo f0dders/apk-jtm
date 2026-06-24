@@ -202,6 +202,8 @@ APKiD requires **Python 3.12** due to a native dependency. The launcher handles 
 
 The app checks for new releases on startup and shows a banner when one is available. Click **"How to update"** in the banner for step-by-step instructions, or follow the relevant path below.
 
+> **No data migration needed.** Your config and reports are stored in a platform-standard location outside the app folder (see below), so they persist untouched across any update.
+
 ### If you installed via Git
 
 ```
@@ -213,11 +215,19 @@ Then re-run the launcher. It will install any new dependencies automatically.
 ### If you downloaded a ZIP
 
 1. Download the new release from the [Releases page](https://github.com/f0dders/apk-jtm/releases)
-2. Extract to a new folder
-3. Copy your `.env` file from the old folder into the new one
-4. Run the launcher in the new folder
+2. Extract anywhere and run the launcher — that's it
 
-> **Your reports are safe.** They live in the `reports/` folder — copy that across too if you want to keep your scan history, or leave it in place and point the new install at the same folder.
+### Where your data is stored
+
+| Platform | Location |
+|---|---|
+| **Mac** | `~/Library/Application Support/APK-JTM/` |
+| **Windows** | `%APPDATA%\APK-JTM\` |
+| **Linux** | `~/.local/share/apk-jtm/` |
+
+The exact path is shown in ⚙ Settings at the bottom of the panel.
+
+If you have an existing install with `.env` and `reports/` in the app folder, the app migrates them automatically on first launch.
 
 ---
 

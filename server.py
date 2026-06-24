@@ -16,6 +16,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import shutil
 import uuid
 from pathlib import Path
 from typing import AsyncIterator
@@ -26,22 +27,40 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from sse_starlette.sse import EventSourceResponse
 
-load_dotenv()
+from paths import DATA_DIR, ENV_PATH, REPORTS_DIR
+from version import VERSION
 
-from version import VERSION  # noqa: E402
+# Ensure data directories exist
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+
+# Migrate legacy data from the app folder (one-time, silent)
+_APP_DIR = Path(__file__).parent
+_legacy_env     = _APP_DIR / ".env"
+_legacy_reports = _APP_DIR / "reports"
+
+if _legacy_env.exists() and not ENV_PATH.exists():
+    shutil.copy2(_legacy_env, ENV_PATH)
+    _legacy_env.rename(_legacy_env.with_name(".env.migrated"))
+    print(f"[APK-JTM] Migrated config  → {ENV_PATH}")
+
+if _legacy_reports.is_dir():
+    for _f in _legacy_reports.iterdir():
+        _dest = REPORTS_DIR / _f.name
+        if not _dest.exists():
+            shutil.copy2(_f, _dest)
+    _legacy_reports.rename(_APP_DIR / "reports.migrated")
+    print(f"[APK-JTM] Migrated reports → {REPORTS_DIR}")
+
+load_dotenv(ENV_PATH)
 
 app = FastAPI(title="APK Security Analyser")
 
-REPORTS_DIR = Path("reports")
-REPORTS_DIR.mkdir(exist_ok=True)
-
-UPLOADS_DIR = Path("uploads")
+UPLOADS_DIR = _APP_DIR / "uploads"
 UPLOADS_DIR.mkdir(exist_ok=True)
 
 # In-memory store: scan_id → asyncio.Queue of SSE events
 _scan_queues: dict[str, asyncio.Queue] = {}
-
-ENV_PATH = Path(".env")
 
 PROVIDERS = ["ollama", "lmstudio", "claude", "openai", "gemini", "groq", "mistral", "openrouter"]
 
@@ -105,7 +124,7 @@ async def save_config(payload: dict):
 
     lines = [f'{k}={v}' for k, v in merged.items()]
     ENV_PATH.write_text("\n".join(lines) + "\n")
-    load_dotenv(override=True)
+    load_dotenv(ENV_PATH, override=True)
     return {"ok": True}
 
 
@@ -117,6 +136,11 @@ async def list_providers():
 @app.get("/api/version")
 async def get_version():
     return {"version": VERSION}
+
+
+@app.get("/api/data-dir")
+async def get_data_dir():
+    return {"data_dir": str(DATA_DIR)}
 
 
 @app.get("/api/ollama/models")
@@ -302,7 +326,7 @@ async def run_scan(
         _send(queue, event, data)
 
     try:
-        load_dotenv(override=True)
+        load_dotenv(ENV_PATH, override=True)
         env = dict(os.environ)
 
         # Build provider

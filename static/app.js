@@ -172,14 +172,17 @@ function renderWizardStep() {
       </div>
       <div class="wizard-version" id="wizard-version-line">Loading version…</div>
     `;
-    // Fetch version asynchronously and inject
-    fetch('/api/version').then(r => r.json()).then(({ version }) => {
+    // Fetch version + data dir asynchronously and inject
+    Promise.all([
+      fetch('/api/version').then(r => r.json()),
+      fetch('/api/data-dir').then(r => r.json()),
+    ]).then(([{ version }, { data_dir }]) => {
       const el = $('wizard-version-line');
       if (!el) return;
       const updateNote = state.latestVersion
         ? ` — <a href="#" onclick="showUpdateModal();return false" style="color:var(--accent)">v${state.latestVersion} available</a>`
         : '';
-      el.innerHTML = `APK-JTM v${version}${updateNote}`;
+      el.innerHTML = `APK-JTM v${version}${updateNote}<br><span class="wizard-data-dir" title="Your config and reports are stored here">Data: ${data_dir}</span>`;
     }).catch(() => {
       const el = $('wizard-version-line');
       if (el) el.textContent = '';

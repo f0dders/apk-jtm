@@ -13,12 +13,16 @@ __pycache__/
 venv/
 .venv/
 
-# App-generated output
+# App-generated output (user data now lives in ~/Library/Application Support/APK-JTM/)
 reports/
+reports.migrated/
 uploads/
 mobsf_raw.json
 report_*.html
 report_*.md
+
+# Legacy migration artefacts
+.env.migrated
 
 # APK files
 *.apk

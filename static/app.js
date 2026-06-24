@@ -764,11 +764,23 @@ function reportCard(r, appNameOverride, isOlder = false) {
     ? `<button class="btn-icon btn-rerun" title="Re-analyse with a different AI model" onclick="event.stopPropagation();showRerun('${r.name}', this)">⟳</button>`
     : '';
 
+  // APKiD flag — only shown when APKiD ran and found something
+  let apkidEl = '';
+  if (r.apkid_available) {
+    if (r.apkid_malware_packer) {
+      apkidEl = `<span class="card-apkid card-apkid-danger" title="APKiD detected a packer associated with malware">🚨 Malware packer</span>`;
+    } else if (r.apkid_packer) {
+      apkidEl = `<span class="card-apkid card-apkid-warn" title="APKiD detected this APK has been packed or obfuscated">📦 Packed</span>`;
+    } else if (r.apkid_anti_vm) {
+      apkidEl = `<span class="card-apkid card-apkid-warn" title="APKiD detected anti-VM techniques — the app may behave differently under analysis">🕵️ Anti-VM</span>`;
+    }
+  }
+
   // Older runs: collapsed single-row view
   if (isOlder) {
     return `
       <div class="report-card report-card-collapsed" onclick="openReport('${r.url}')">
-        <div class="collapsed-verdict">${verdictEl}</div>
+        <div class="collapsed-verdict">${verdictEl}${apkidEl}</div>
         <div class="collapsed-model">${tierEl}</div>
         <div class="collapsed-date">${dateStr}</div>
         <div class="card-actions" onclick="event.stopPropagation()">
@@ -785,7 +797,7 @@ function reportCard(r, appNameOverride, isOlder = false) {
       <div class="card-body">
         <div class="card-title">${appName} <span class="card-version">${version}</span></div>
         <div class="card-package">${r.package || ''}</div>
-        ${verdictEl}
+        ${verdictEl}${apkidEl}
         ${summaryEl}
         ${trackerEl}
         <div class="card-date">${dateStr} · ${size}</div>

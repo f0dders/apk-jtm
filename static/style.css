@@ -265,6 +265,9 @@ select option { background: var(--surface2); }
 .card-verdict-unrated { background: var(--surface); color: var(--text-muted); border: 1px solid var(--border); }
 .card-summary { font-size: 12px; color: var(--text-muted); line-height: 1.45; margin-bottom: 4px; }
 .card-tracker-warn { font-size: 11px; color: #ef4444; font-weight: 600; margin-bottom: 3px; }
+.card-apkid { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 9px; border-radius: 99px; margin-left: 6px; vertical-align: middle; }
+.card-apkid-danger { background: #fee2e2; color: #991b1b; }
+.card-apkid-warn   { background: #fff7ed; color: #c2410c; }
 .card-date { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
 .card-model { display: flex; align-items: center; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
 .card-tier-badge { font-size: 10px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: #fff; padding: 2px 8px; border-radius: 99px; flex-shrink: 0; }

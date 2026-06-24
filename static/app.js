@@ -828,7 +828,7 @@ function reportCard(r, appNameOverride, isOlder = false) {
     } else if (r.apkid_anti_vm) {
       apkidEl = `<span class="card-apkid card-apkid-info" title="App detects virtual environments — may not run on emulators or test devices">🕵️ Anti-emulator</span>`;
     } else {
-      apkidEl = `<span class="card-apkid card-apkid-clean" title="APKiD: no packers, obfuscators, or evasion techniques detected">✅ No packers</span>`;
+      apkidEl = `<span class="card-apkid card-apkid-clean" title="APKiD: no packers, obfuscators, or evasion techniques detected — the app was built with a standard toolchain">✅ Clean build</span>`;
     }
   }
 

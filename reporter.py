@@ -506,7 +506,7 @@ def _build_chips(app_info: dict) -> str:
             chips.append(_chip("♻️", "Repackaged (dex2jar)", [], "warn"))
         if not any([packer_names, apkid.get("has_anti_vm"), apkid.get("has_anti_debug"), apkid.get("repackaged")]):
             compiler = ", ".join(apkid.get("compilers", [])) or "standard"
-            chips.append(_chip("✅", f"No packers — {compiler}", [], ""))
+            chips.append(_chip("✅", f"Clean build — {compiler}", [], ""))
 
     return "\n".join(chips)
 

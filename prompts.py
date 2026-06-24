@@ -80,6 +80,30 @@ def build_analysis_prompt(extracted: dict) -> str:
         cert_text = "\n".join(f"- {i}" for i in net["certificate_issues"])
         sections.append(f"## Certificate Issues\n{cert_text}")
 
+    apkid = extracted.get("apkid", {})
+    if apkid.get("available"):
+        lines = []
+        if apkid.get("compilers"):
+            lines.append(f"- **Compiler(s):** {', '.join(apkid['compilers'])}")
+        if apkid.get("packers"):
+            flag = " ⚠ KNOWN MALWARE PACKER" if apkid.get("known_malware_packer") else ""
+            lines.append(f"- **Packer(s) detected:** {', '.join(apkid['packers'])}{flag}")
+        if apkid.get("obfuscators"):
+            flag = " ⚠ SUSPICIOUS" if apkid.get("suspicious_obfuscator") else " (normal)"
+            lines.append(f"- **Obfuscator(s):** {', '.join(apkid['obfuscators'])}{flag}")
+        if apkid.get("anti_vm"):
+            lines.append(f"- **Anti-VM techniques:** {', '.join(apkid['anti_vm'])} ⚠ EVASION DETECTED")
+        if apkid.get("anti_debug"):
+            lines.append(f"- **Anti-debug/disassembly:** {', '.join(apkid['anti_debug'] + apkid.get('anti_disassembly', []))}")
+        if apkid.get("abnormal"):
+            lines.append(f"- **Abnormal DEX features:** {', '.join(apkid['abnormal'])}")
+        if apkid.get("repackaged"):
+            lines.append("- **Repackaging detected:** compiled via dex2jar, suggesting this APK was rebuilt from a JAR ⚠")
+        if lines:
+            sections.append("## Packer & Obfuscation Analysis (APKiD)\n" + "\n".join(lines))
+    elif apkid.get("available") is False and not apkid.get("reason", "").startswith("APKiD not installed"):
+        sections.append(f"## Packer & Obfuscation Analysis (APKiD)\n- APKiD scan failed: {apkid.get('reason', 'unknown error')}")
+
     locations = net.get("server_locations", {})
     if locations:
         loc_lines = "\n".join(
@@ -149,6 +173,14 @@ Where are this app's servers hosted, and what does that mean for user privacy? U
 - Note if the jurisdiction is unclear (no geolocation data available)
 - Conclude with a geographic risk rating: **Low** (GDPR/Five Eyes jurisdictions with strong privacy laws), **Medium** (mixed or unclear jurisdictions), or **High** (countries with poor data protection or active state surveillance)
 3–5 bullet points.
+
+## Packer & Obfuscation Analysis
+Only include this section if APKiD data is present above. Explain in plain English what the findings mean:
+- What a packer is and why legitimate apps rarely use them (they wrap the real code to prevent analysis)
+- Whether the detected packer is associated with malware tooling or is a standard commercial protector
+- What anti-VM or anti-debug techniques indicate (the app knows it's being watched and tries to behave differently)
+- Whether the compiler fingerprint is normal for the app type
+Keep this section brief — 2–4 bullet points. If APKiD data is not present, omit this section entirely.
 
 ## Red Flags
 Unambiguous list of anything that suggests malicious behaviour, spyware, or dangerously poor security practice — **after accounting for the app's known purpose**. If the app is unknown or unverifiable, list that explicitly as a red flag. If nothing rises to this level, write one sentence: "No significant red flags identified."

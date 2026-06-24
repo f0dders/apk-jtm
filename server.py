@@ -309,6 +309,7 @@ async def run_scan(
 
         # Load or scan
         raw_report = None
+        apkid_results: dict = {"available": False, "reason": "APKiD only runs on direct APK scans"}
 
         if report_path:
             send("progress", {"stage": "loading", "message": "Loading MobSF report..."})
@@ -342,11 +343,30 @@ async def run_scan(
             from mobsf_client import MobSFClient
             client = MobSFClient(mobsf_url, mobsf_key)
 
+            # Run MobSF scan and APKiD in parallel
+            from apkid_client import run_apkid
+
+            send("progress", {"stage": "apkid", "message": "Running packer/obfuscation analysis (APKiD)..."})
+
             try:
-                raw_report = await asyncio.to_thread(client.upload_and_scan, apk_path)
+                raw_report, apkid_results = await asyncio.gather(
+                    asyncio.to_thread(client.upload_and_scan, apk_path),
+                    asyncio.to_thread(run_apkid, apk_path),
+                )
             except Exception as e:
                 send("error", {"message": f"MobSF error: {e}"})
                 return
+
+            if apkid_results.get("available"):
+                flags = []
+                if apkid_results.get("known_malware_packer"): flags.append("⚠ malware packer detected")
+                elif apkid_results.get("has_packer"):          flags.append("packer detected")
+                if apkid_results.get("has_anti_vm"):           flags.append("anti-VM")
+                if apkid_results.get("has_anti_debug"):        flags.append("anti-debug")
+                msg = "APKiD complete" + (f" — {', '.join(flags)}" if flags else " — no packers detected")
+                send("progress", {"stage": "apkid", "message": msg})
+            else:
+                send("progress", {"stage": "apkid", "message": apkid_results.get("reason", "APKiD skipped")})
 
             if raw_report.get("_cached"):
                 send("progress", {"stage": "scan", "message": "Already scanned — using cached MobSF results ⚡"})
@@ -356,6 +376,7 @@ async def run_scan(
         send("progress", {"stage": "extract", "message": "Extracting key findings..."})
         import extractor
         extracted = extractor.extract(raw_report)
+        extracted["apkid"] = apkid_results
 
         app_info = extracted["app"]
         send("progress", {
@@ -484,6 +505,7 @@ async def run_scan(
             "code_issues_list": [i.get("title", "")[:60] for i in extracted["code_issues"][:15]],
             "manifest_issues_count": len(extracted["manifest_issues"]),
             "icon_b64": icon_b64,
+            "apkid": extracted.get("apkid", {}),
             "ai_provider":  provider_name,
             "ai_model":     provider.model,
             "ai_model_tier": _classify_model(provider.model),

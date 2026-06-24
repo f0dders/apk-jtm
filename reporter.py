@@ -329,6 +329,10 @@ def save_report(app_info: dict, ai_report: str, output_dir: str = ".") -> str:
         "ai_verdict_cls":   ai_verdict_cls,
         "ai_summary":       app_info.get("ai_summary", ""),
         "perms_summary":    app_info.get("perms_summary", ""),
+        "apkid_available":  app_info.get("apkid", {}).get("available", False),
+        "apkid_packer":     app_info.get("apkid", {}).get("has_packer", False),
+        "apkid_anti_vm":    app_info.get("apkid", {}).get("has_anti_vm", False),
+        "apkid_malware_packer": app_info.get("apkid", {}).get("known_malware_packer", False),
     }, indent=2))
 
     return str(html_path)
@@ -483,6 +487,25 @@ def _build_chips(app_info: dict) -> str:
         except (ValueError, TypeError):
             level = ""
         chips.append(_chip("📊", f"CVSS {cvss}", [], level))
+
+    apkid = app_info.get("apkid", {})
+    if apkid.get("available"):
+        packer_names = apkid.get("packers", [])
+        obfs_names   = apkid.get("obfuscators", [])
+        if apkid.get("known_malware_packer"):
+            chips.append(_chip("🚨", f"Malware packer: {', '.join(packer_names)}", [], "danger"))
+        elif packer_names:
+            chips.append(_chip("📦", f"Packed: {', '.join(packer_names)}", [], "warn"))
+        if apkid.get("has_anti_vm"):
+            chips.append(_chip("🕵️", "Anti-VM detected", apkid.get("anti_vm", []), "danger"))
+        if apkid.get("has_anti_debug"):
+            items = apkid.get("anti_debug", []) + apkid.get("anti_disassembly", [])
+            chips.append(_chip("🛡️", "Anti-debug detected", items, "warn"))
+        if apkid.get("repackaged"):
+            chips.append(_chip("♻️", "Repackaged (dex2jar)", [], "warn"))
+        if not any([packer_names, apkid.get("has_anti_vm"), apkid.get("has_anti_debug"), apkid.get("repackaged")]):
+            compiler = ", ".join(apkid.get("compilers", [])) or "standard"
+            chips.append(_chip("✅", f"No packers — {compiler}", [], ""))
 
     return "\n".join(chips)
 

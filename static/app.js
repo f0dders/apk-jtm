@@ -405,13 +405,14 @@ async function startScan() {
 
 // ─── Progress / streaming ─────────────────────────────────────────────────────
 const STAGE_LABELS = {
-  provider: 'AI provider ready',
-  loading: 'Loading MobSF report',
-  upload: 'Uploading to MobSF',
-  scan: 'Scanning APK',
-  extract: 'Extracting findings',
+  provider:  'AI provider ready',
+  loading:   'Loading MobSF report',
+  upload:    'Uploading to MobSF',
+  apkid:     'Packer & obfuscation check',
+  scan:      'Scanning APK',
+  extract:   'Extracting findings',
   extracted: 'Findings extracted',
-  analysis: 'AI analysis',
+  analysis:  'AI analysis',
 };
 
 function resetProgressView() {

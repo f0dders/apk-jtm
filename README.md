@@ -198,6 +198,29 @@ APKiD requires **Python 3.12** due to a native dependency. The launcher handles 
 
 ---
 
+## Updating
+
+The app checks for new releases on startup and shows a banner when one is available. Click **"How to update"** in the banner for step-by-step instructions, or follow the relevant path below.
+
+### If you installed via Git
+
+```
+git pull
+```
+
+Then re-run the launcher. It will install any new dependencies automatically.
+
+### If you downloaded a ZIP
+
+1. Download the new release from the [Releases page](https://github.com/f0dders/apk-jtm/releases)
+2. Extract to a new folder
+3. Copy your `.env` file from the old folder into the new one
+4. Run the launcher in the new folder
+
+> **Your reports are safe.** They live in the `reports/` folder — copy that across too if you want to keep your scan history, or leave it in place and point the new install at the same folder.
+
+---
+
 ## Stopping the app
 
 Close the terminal window that opened when you launched the app. MobSF continues running in the background — stop it from Docker Desktop or run `docker stop mobsf`.

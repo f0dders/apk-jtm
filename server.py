@@ -28,6 +28,8 @@ from sse_starlette.sse import EventSourceResponse
 
 load_dotenv()
 
+from version import VERSION  # noqa: E402
+
 app = FastAPI(title="APK Security Analyser")
 
 REPORTS_DIR = Path("reports")
@@ -110,6 +112,11 @@ async def save_config(payload: dict):
 @app.get("/api/providers")
 async def list_providers():
     return {"providers": PROVIDERS}
+
+
+@app.get("/api/version")
+async def get_version():
+    return {"version": VERSION}
 
 
 @app.get("/api/ollama/models")

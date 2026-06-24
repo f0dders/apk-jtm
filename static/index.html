@@ -173,6 +173,44 @@
 </div>
 
 <div id="toast"></div>
+
+<!-- Update available banner -->
+<div id="update-banner" class="hidden">
+  <span id="update-banner-text"></span>
+  <button class="update-banner-btn" onclick="showUpdateModal()">How to update</button>
+  <button class="update-banner-dismiss" onclick="dismissUpdateBanner()" title="Dismiss">✕</button>
+</div>
+
+<!-- Update instructions modal -->
+<div id="update-modal-overlay" class="modal-overlay hidden" onclick="hideUpdateModal()">
+  <div class="modal-box" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <div class="modal-title">Updating APK-JTM</div>
+      <button class="modal-close" onclick="hideUpdateModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="update-path">
+        <div class="update-path-title">If you installed via Git (recommended)</div>
+        <ol>
+          <li>Open a terminal in the APK-JTM folder</li>
+          <li>Run: <code>git pull</code></li>
+          <li>Re-run the launcher — it will update dependencies automatically</li>
+        </ol>
+      </div>
+      <div class="update-path">
+        <div class="update-path-title">If you downloaded a ZIP</div>
+        <ol>
+          <li>Download the new release from <a id="update-release-link" href="#" target="_blank" rel="noopener">GitHub Releases</a></li>
+          <li>Extract to a new folder</li>
+          <li>Copy your <code>.env</code> file from the old folder into the new one</li>
+          <li>Run the launcher in the new folder</li>
+        </ol>
+      </div>
+      <div class="update-note">Your reports are stored in the <code>reports/</code> folder — they are not affected by an update.</div>
+    </div>
+  </div>
+</div>
+
 <script src="/static/app.js"></script>
 </body>
 </html>

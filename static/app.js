@@ -34,6 +34,61 @@ async function init() {
     // Server unreachable or JS error — go straight to wizard so user isn't stuck
     setView('wizard');
   }
+
+  // Check for updates once per session (non-blocking, silent on failure)
+  if (!sessionStorage.getItem('updateChecked')) {
+    sessionStorage.setItem('updateChecked', '1');
+    checkForUpdate();
+  }
+}
+
+async function checkForUpdate() {
+  try {
+    const [{ version: current }, ghData] = await Promise.all([
+      fetch('/api/version').then(r => r.json()),
+      fetch('https://api.github.com/repos/f0dders/apk-jtm/releases/latest', {
+        headers: { Accept: 'application/vnd.github+json' },
+      }).then(r => r.json()),
+    ]);
+    const latest = ghData.tag_name?.replace(/^v/, '');
+    if (!latest || !current) return;
+    if (compareVersions(latest, current) > 0) {
+      state.latestVersion = latest;
+      state.releaseUrl = ghData.html_url || 'https://github.com/f0dders/apk-jtm/releases';
+      showUpdateBanner(current, latest);
+    }
+  } catch {
+    // Network unavailable or GitHub unreachable — silent fail
+  }
+}
+
+function compareVersions(a, b) {
+  const pa = a.split('.').map(Number);
+  const pb = b.split('.').map(Number);
+  for (let i = 0; i < 3; i++) {
+    if ((pa[i] || 0) > (pb[i] || 0)) return 1;
+    if ((pa[i] || 0) < (pb[i] || 0)) return -1;
+  }
+  return 0;
+}
+
+function showUpdateBanner(current, latest) {
+  $('update-banner-text').textContent = `APK-JTM v${latest} is available — you're on v${current}`;
+  $('update-banner').classList.remove('hidden');
+}
+
+function dismissUpdateBanner() {
+  $('update-banner').classList.add('hidden');
+}
+
+function showUpdateModal() {
+  const link = $('update-release-link');
+  if (link) link.href = state.releaseUrl || 'https://github.com/f0dders/apk-jtm/releases';
+  $('update-modal-overlay').classList.remove('hidden');
+}
+
+function hideUpdateModal() {
+  $('update-modal-overlay').classList.add('hidden');
 }
 
 function skipToApp() {
@@ -99,9 +154,10 @@ function renderWizardStep() {
   if (!body) return;
 
   if (state.wizardStep === 1) {
+    const isSettings = !!state.config.configured;
     body.innerHTML = `
-      <div class="wizard-title">Welcome to APK-JTM</div>
-      <div class="wizard-subtitle">Let's get you set up in 3 quick steps. First, enter your MobSF details.</div>
+      <div class="wizard-title">${isSettings ? 'Settings' : 'Welcome to APK-JTM'}</div>
+      <div class="wizard-subtitle">${isSettings ? 'Update your MobSF connection and AI provider settings below.' : 'Let\'s get you set up in 3 quick steps. First, enter your MobSF details.'}</div>
       <div class="field">
         <label>MobSF URL</label>
         <input id="wiz-mobsf-url" type="text" value="${state.config.mobsf_url || 'http://localhost:8000'}" placeholder="http://localhost:8000">
@@ -114,7 +170,20 @@ function renderWizardStep() {
                placeholder="Paste your API key from MobSF → REST API">
         <div class="field-hint">${state.config.mobsf_key_set ? '✓ Key saved — leave blank to keep existing key.' : 'Find it at http://localhost:8000 → top-right menu → REST API'}</div>
       </div>
+      <div class="wizard-version" id="wizard-version-line">Loading version…</div>
     `;
+    // Fetch version asynchronously and inject
+    fetch('/api/version').then(r => r.json()).then(({ version }) => {
+      const el = $('wizard-version-line');
+      if (!el) return;
+      const updateNote = state.latestVersion
+        ? ` — <a href="#" onclick="showUpdateModal();return false" style="color:var(--accent)">v${state.latestVersion} available</a>`
+        : '';
+      el.innerHTML = `APK-JTM v${version}${updateNote}`;
+    }).catch(() => {
+      const el = $('wizard-version-line');
+      if (el) el.textContent = '';
+    });
   }
 
   if (state.wizardStep === 2) {

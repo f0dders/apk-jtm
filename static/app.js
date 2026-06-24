@@ -763,10 +763,23 @@ function reportCard(r, appNameOverride, isOlder = false) {
     ? `<button class="btn-icon btn-rerun" title="Re-analyse with a different AI model" onclick="event.stopPropagation();showRerun('${r.name}', this)">⟳</button>`
     : '';
 
-  const olderClass = isOlder ? ' card-older' : '';
+  // Older runs: collapsed single-row view
+  if (isOlder) {
+    return `
+      <div class="report-card report-card-collapsed" onclick="openReport('${r.url}')">
+        <div class="collapsed-verdict">${verdictEl}</div>
+        <div class="collapsed-model">${tierEl}</div>
+        <div class="collapsed-date">${dateStr}</div>
+        <div class="card-actions" onclick="event.stopPropagation()">
+          <button class="btn-icon" title="Open" onclick="openReport('${r.url}')">↗</button>
+          ${rerunBtn}
+          <button class="btn-icon btn-delete" title="Delete" onclick="deleteReport('${r.name}', this)">🗑</button>
+        </div>
+      </div>`;
+  }
 
   return `
-    <div class="report-card${olderClass}" onclick="openReport('${r.url}')">
+    <div class="report-card" onclick="openReport('${r.url}')">
       <div class="card-score-wrap">${scoreEl}</div>
       <div class="card-body">
         <div class="card-title">${appName} <span class="card-version">${version}</span></div>

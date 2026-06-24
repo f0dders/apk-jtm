@@ -296,8 +296,16 @@ select option { background: var(--surface2); }
 }
 .group-app-name { font-size: 13px; font-weight: 700; color: var(--text); }
 .group-run-count { font-size: 11px; color: var(--text-muted); }
-.card-older { opacity: 0.75; }
-.card-older:hover { opacity: 1; }
+.report-card-collapsed {
+  padding: 8px 18px; gap: 10px; align-items: center;
+  opacity: 0.7;
+}
+.report-card-collapsed:hover { opacity: 1; }
+.collapsed-verdict { flex-shrink: 0; }
+.collapsed-verdict .card-verdict { margin: 0; }
+.collapsed-model { flex: 1; min-width: 0; }
+.collapsed-model .card-model { margin: 0; }
+.collapsed-date { font-size: 11px; color: var(--text-muted); flex-shrink: 0; white-space: nowrap; }
 
 /* Re-run panel */
 .rerun-panel {

@@ -1,11 +1,10 @@
 #!/bin/bash
-# APK Analyser — Mac launcher
+# APK-JTM — Mac launcher
 # Double-click this file to start the app.
 # On first run: right-click → Open (required once due to macOS security).
 
 cd "$(dirname "$0")"
 
-# ── Colours ──────────────────────────────────────────────────────────────────
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
 CYAN='\033[0;36m'; BOLD='\033[1m'; RESET='\033[0m'
 
@@ -14,67 +13,156 @@ echo -e "${BOLD}  APK-JTM — Just tell me if it's dodgy!${RESET}"
 echo -e "  ─────────────────────────────────────"
 echo ""
 
-# ── Check Python ─────────────────────────────────────────────────────────────
-if ! command -v python3 &>/dev/null; then
-  echo -e "${RED}  [ERROR] Python 3 is not installed.${RESET}"
+# ── Helper: yes/no prompt ─────────────────────────────────────────────────────
+confirm() {
+  local msg="$1"
+  while true; do
+    read -rp "  $msg [y/n] " ans
+    case "$ans" in
+      [Yy]*) return 0 ;;
+      [Nn]*) return 1 ;;
+    esac
+  done
+}
+
+# ── Homebrew ──────────────────────────────────────────────────────────────────
+BREW=""
+for candidate in /opt/homebrew/bin/brew /usr/local/bin/brew; do
+  if [ -x "$candidate" ]; then BREW="$candidate"; break; fi
+done
+
+if [ -z "$BREW" ]; then
+  echo -e "  ${YELLOW}Homebrew not found.${RESET}"
+  echo "  Homebrew is the recommended way to install Python 3.12 and manage"
+  echo "  dependencies on macOS. The app can still run without it, but packer"
+  echo "  analysis (APKiD) requires Python 3.12 which Homebrew makes easy."
   echo ""
-  echo "  Please install it from: https://www.python.org/downloads/"
-  echo "  Then double-click this file again."
+  if confirm "Install Homebrew now? (visits brew.sh — safe, open source)"; then
+    echo ""
+    echo -e "  ${CYAN}Installing Homebrew...${RESET}"
+    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/homebrew/install/HEAD/install.sh)"
+    # Re-check after install
+    for candidate in /opt/homebrew/bin/brew /usr/local/bin/brew; do
+      if [ -x "$candidate" ]; then BREW="$candidate"; break; fi
+    done
+    if [ -n "$BREW" ]; then
+      echo -e "  ${GREEN}✓${RESET} Homebrew installed"
+    else
+      echo -e "  ${YELLOW}Homebrew install may need a terminal restart to take effect.${RESET}"
+    fi
+  else
+    echo -e "  ${YELLOW}Skipping Homebrew — continuing without it.${RESET}"
+  fi
   echo ""
-  read -p "  Press Enter to close..."
-  exit 1
 fi
 
-PY_VER=$(python3 -c 'import sys; print(sys.version_info.minor)')
-if [ "$PY_VER" -lt 10 ]; then
-  echo -e "${RED}  [ERROR] Python 3.10 or newer is required.${RESET}"
-  echo "  Your version: $(python3 --version)"
-  echo "  Download from: https://www.python.org/downloads/"
-  echo ""
-  read -p "  Press Enter to close..."
-  exit 1
+# ── Python — prefer 3.12 for APKiD compatibility ─────────────────────────────
+PYTHON=""
+for candidate in python3.12 python3.13 python3.11 python3.10 python3; do
+  if command -v "$candidate" &>/dev/null; then
+    VER=$("$candidate" -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
+    MAJOR=${VER%%.*}; MINOR=${VER##*.}
+    if [ "$MAJOR" -ge 3 ] && [ "$MINOR" -ge 10 ]; then
+      PYTHON="$candidate"; break
+    fi
+  fi
+done
+
+# If no suitable Python, try to install 3.12 via Homebrew
+if [ -z "$PYTHON" ]; then
+  if [ -n "$BREW" ]; then
+    echo -e "  ${YELLOW}No compatible Python found. Python 3.10+ is required.${RESET}"
+    echo ""
+    if confirm "Install Python 3.12 via Homebrew?"; then
+      echo -e "  ${CYAN}Installing Python 3.12...${RESET}"
+      "$BREW" install python@3.12
+      if command -v python3.12 &>/dev/null; then
+        PYTHON=python3.12
+        echo -e "  ${GREEN}✓${RESET} Python 3.12 installed"
+      fi
+    fi
+  fi
+  if [ -z "$PYTHON" ]; then
+    echo -e "${RED}  [ERROR] No compatible Python found (3.10+ required).${RESET}"
+    echo ""
+    echo "  Install Python 3.12 from: https://www.python.org/downloads/"
+    echo "  Or with Homebrew:  brew install python@3.12"
+    echo ""
+    read -rp "  Press Enter to close..."
+    exit 1
+  fi
 fi
 
-echo -e "  ${GREEN}✓${RESET} Python $(python3 --version | cut -d' ' -f2)"
+PY_VER=$("$PYTHON" -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
+MINOR_ONLY=$("$PYTHON" -c 'import sys; print(sys.version_info.minor)')
+
+echo -e "  ${GREEN}✓${RESET} Python $PY_VER ($PYTHON)"
+
+# Suggest upgrading to 3.12 for APKiD if on a newer/older version
+if [ "$MINOR_ONLY" -ge 14 ] || { [ "$MINOR_ONLY" -lt 12 ] && [ "$MINOR_ONLY" -ge 10 ]; }; then
+  if [ -n "$BREW" ] && ! command -v python3.12 &>/dev/null; then
+    echo -e "  ${YELLOW}Note:${RESET} Python $PY_VER may not support packer analysis (APKiD requires 3.12)."
+    echo ""
+    if confirm "Install Python 3.12 alongside your current version for full functionality?"; then
+      echo -e "  ${CYAN}Installing Python 3.12...${RESET}"
+      "$BREW" install python@3.12 && PYTHON=python3.12
+      echo -e "  ${GREEN}✓${RESET} Python 3.12 installed — using it for this app"
+    fi
+    echo ""
+  fi
+fi
 
 # ── Virtual environment ───────────────────────────────────────────────────────
+# Rebuild venv if it was created with a different Python
+VENV_PYTHON=""
+[ -f ".venv/bin/python3" ] && VENV_PYTHON=$(.venv/bin/python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")' 2>/dev/null)
+WANT_PYTHON=$("$PYTHON" -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
+
+if [ -d ".venv" ] && [ "$VENV_PYTHON" != "$WANT_PYTHON" ]; then
+  echo -e "  ${CYAN}Updating virtual environment to Python $WANT_PYTHON...${RESET}"
+  rm -rf .venv
+fi
+
 if [ ! -d ".venv" ]; then
   echo -e "  ${CYAN}Creating virtual environment (first run only)...${RESET}"
-  if ! python3 -m venv .venv; then
+  if ! "$PYTHON" -m venv .venv; then
     echo -e "${RED}  [ERROR] Failed to create virtual environment.${RESET}"
-    read -p "  Press Enter to close..."
+    read -rp "  Press Enter to close..."
     exit 1
   fi
 fi
 
 source .venv/bin/activate
 
-# ── Install / update dependencies ────────────────────────────────────────────
+# ── Core dependencies ─────────────────────────────────────────────────────────
 echo -e "  ${CYAN}Checking dependencies...${RESET}"
-
-# Show errors but suppress routine progress output
-if ! pip install -r requirements.txt --upgrade -q 2>&1 | grep -v "^$" | grep -i "error\|warning\|failed" >&2; then
-  : # pip succeeded (grep found no errors, non-zero exit is fine here)
-fi
-
-# Re-run to catch actual failures
 if ! pip install -r requirements.txt --upgrade -q; then
-  echo ""
   echo -e "${RED}  [ERROR] Failed to install dependencies.${RESET}"
   echo "  Check your internet connection and try again."
-  echo ""
-  read -p "  Press Enter to close..."
+  read -rp "  Press Enter to close..."
   exit 1
 fi
-
 echo -e "  ${GREEN}✓${RESET} Dependencies ready"
+
+# ── APKiD (optional — requires Python 3.12, native build tools) ───────────────
+if pip install apkid -q 2>/dev/null; then
+  echo -e "  ${GREEN}✓${RESET} APKiD ready (packer analysis enabled)"
+else
+  echo -e "  ${YELLOW}Note:${RESET} APKiD unavailable on Python $PY_VER — packer analysis skipped"
+  if [ "$MINOR_ONLY" -ge 14 ] && [ -n "$BREW" ]; then
+    echo "        To enable: brew install python@3.12  (then re-run this launcher)"
+  fi
+fi
 echo ""
 
-# ── Docker / MobSF (optional) ─────────────────────────────────────────────────
+# ── Docker ────────────────────────────────────────────────────────────────────
 if ! command -v docker &>/dev/null; then
-  echo -e "  ${YELLOW}Note:${RESET} Docker not found — APK scanning via MobSF won't be available."
-  echo "  You can still load an existing MobSF JSON report for AI analysis."
+  echo -e "  ${YELLOW}Docker not found.${RESET}"
+  echo "  Docker is required to run MobSF for APK scanning."
+  echo "  You can still load an existing MobSF JSON report without Docker."
+  echo ""
   echo "  Install Docker Desktop: https://www.docker.com/products/docker-desktop"
+  echo "  (Docker Desktop must be installed manually — it cannot be auto-installed.)"
   echo ""
 else
   if ! curl -s --max-time 3 http://localhost:8000 &>/dev/null; then
@@ -103,4 +191,4 @@ python3 launch.py
 
 echo ""
 echo "  Server stopped. Close this window."
-read -p ""
+read -rp ""

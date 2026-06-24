@@ -444,13 +444,36 @@ function streamProgress(scanId) {
     return el;
   }
 
+  // Tidy completion messages shown per stage when no explicit msg is given
+  const STAGE_DONE_MSG = {
+    provider:  '',          // keep "Using claude / …" as-is
+    upload:    'Uploaded',
+    apkid:     '',          // keep APKiD result text as-is
+    scan:      '',          // keep "Scan complete." / "Using cached…" as-is
+    extract:   'Done',
+    extracted: '',
+    loading:   '',
+    analysis:  'Complete',
+  };
+
   function markStageDone(key, msg = '') {
     const el = stages[key];
     if (!el) return;
     el.classList.remove('active');
     el.classList.add('done');
     el.querySelector('.stage-icon').textContent = '✓';
-    if (msg) el.querySelector('.stage-msg').textContent = msg;
+    const msgEl = el.querySelector('.stage-msg');
+    if (msg) {
+      msgEl.textContent = msg;
+    } else {
+      // Strip trailing "..." from in-progress messages, replace with tidy fallback
+      const current = msgEl.textContent;
+      if (current.endsWith('...') || current.endsWith('…')) {
+        msgEl.textContent = STAGE_DONE_MSG[key] ?? 'Done';
+      } else if (STAGE_DONE_MSG[key] && !current) {
+        msgEl.textContent = STAGE_DONE_MSG[key];
+      }
+    }
   }
 
   const evtSource = new EventSource(`/api/scan/${scanId}/stream`);
@@ -525,6 +548,21 @@ function streamProgress(scanId) {
     evtSource.close();
     Object.keys(stages).forEach(k => markStageDone(k));
     state.reportUrl = data.report_url;
+
+    // Update heading and subtitle to reflect completion
+    const heading = document.querySelector('#view-progress h2');
+    const subtitle = document.querySelector('#view-progress .text-muted');
+    if (heading) heading.textContent = 'Analysis complete';
+    if (subtitle) subtitle.textContent = 'Your report is ready — click View Report to see the findings.';
+
+    // Update terminal label
+    const termLabel = document.querySelector('#progress-terminal-wrap .text-muted');
+    if (termLabel) termLabel.textContent = 'AI output';
+
+    // Promote View Report to primary button
+    const btn = $('btn-view-report');
+    btn.className = btn.className.replace('btn-secondary', 'btn-primary');
+
     show('btn-view-report');
     hide('btn-cancel-scan');
     toast('Analysis complete', 'ok');

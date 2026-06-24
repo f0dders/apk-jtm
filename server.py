@@ -200,6 +200,7 @@ async def rerun_report(filename: str, payload: dict, background_tasks: Backgroun
         provider_override=payload.get("provider"),
         model_override=payload.get("model"),
         mobsf_hash=md5,
+        prior_apkid=meta.get("apkid_full"),
     )
 
     return {"scan_id": scan_id}
@@ -284,6 +285,7 @@ async def run_scan(
     provider_override: str | None,
     model_override: str | None,
     mobsf_hash: str | None = None,
+    prior_apkid: dict | None = None,
 ):
     queue = _scan_queues.get(scan_id)
     if not queue:
@@ -309,7 +311,8 @@ async def run_scan(
 
         # Load or scan
         raw_report = None
-        apkid_results: dict = {"available": False, "reason": "APKiD only runs on direct APK scans"}
+        # Re-runs reuse APKiD results from the original scan (APK unchanged)
+        apkid_results: dict = prior_apkid if prior_apkid else {"available": False, "reason": "APKiD only runs on direct APK scans"}
 
         if report_path:
             send("progress", {"stage": "loading", "message": "Loading MobSF report..."})
@@ -331,6 +334,17 @@ async def run_scan(
                 send("error", {"message": f"MobSF error fetching cached scan: {e}"})
                 return
             send("progress", {"stage": "loading", "message": "Scan data loaded from MobSF ⚡"})
+            # Surface APKiD stage for re-runs — reuse results from original scan
+            if apkid_results.get("available"):
+                flags = []
+                if apkid_results.get("known_malware_packer"): flags.append("⚠ malware packer detected")
+                elif apkid_results.get("has_packer"):          flags.append("packer detected")
+                if apkid_results.get("has_anti_vm"):           flags.append("anti-emulator")
+                if apkid_results.get("has_anti_debug"):        flags.append("anti-debug")
+                msg = "Reusing APKiD results from original scan" + (f" — {', '.join(flags)}" if flags else " — no packers detected")
+                send("progress", {"stage": "apkid", "message": msg})
+            else:
+                send("progress", {"stage": "apkid", "message": "No APKiD data from original scan (APK needed to run APKiD)"})
         else:
             mobsf_url = env.get("MOBSF_URL", "http://localhost:8000")
             mobsf_key = env.get("MOBSF_API_KEY", "")

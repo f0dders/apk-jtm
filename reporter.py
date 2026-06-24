@@ -333,6 +333,7 @@ def save_report(app_info: dict, ai_report: str, output_dir: str = ".") -> str:
         "apkid_packer":     app_info.get("apkid", {}).get("has_packer", False),
         "apkid_anti_vm":    app_info.get("apkid", {}).get("has_anti_vm", False),
         "apkid_malware_packer": app_info.get("apkid", {}).get("known_malware_packer", False),
+        "apkid_full":       app_info.get("apkid", {}),
     }, indent=2))
 
     return str(html_path)

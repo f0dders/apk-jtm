@@ -320,6 +320,16 @@ def save_report(app_info: dict, ai_report: str, output_dir: str = ".") -> str:
         "timestamp":      timestamp,
         "perms":          app_info.get("dangerous_perms_count", 0),
         "trackers":       app_info.get("trackers_count", 0),
+        # Detailed lists — kept for version-to-version comparison. Older
+        # reports won't have these keys; comparison degrades gracefully.
+        "perms_list":        app_info.get("dangerous_perms_list", []),
+        "trackers_list":     app_info.get("trackers_list", []),
+        "domains_list":      app_info.get("domains_list", []),
+        "domains_count":     app_info.get("domains_count", 0),
+        "secrets_list":      app_info.get("secrets_list", []),
+        "secrets_count":     app_info.get("secrets_count", 0),
+        "code_issues_list":  app_info.get("code_issues_list", []),
+        "code_issues_count": app_info.get("code_issues_count", 0),
         "ai_provider":    app_info.get("ai_provider", ""),
         "ai_model":       app_info.get("ai_model", ""),
         "ai_model_tier":  tier,

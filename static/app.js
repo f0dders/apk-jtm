@@ -818,14 +818,15 @@ async function loadHistory() {
       if (!groups[key]) { groups[key] = []; groupOrder.push(key); }
       groups[key].push(r);
     }
+    state.reportGroups = groups;
 
-    list.innerHTML = groupOrder.map(key => reportGroup(groups[key])).join('');
+    list.innerHTML = groupOrder.map(key => reportGroup(groups[key], key)).join('');
   } catch {
     list.innerHTML = '<div class="text-muted text-sm">Failed to load reports.</div>';
   }
 }
 
-function reportGroup(runs) {
+function reportGroup(runs, groupKey) {
   const latest = runs[0]; // already sorted newest-first from API
   const appName = latest.app_name || latest.name.replace('report_','').replace('.html','').replace(/_(\d{8}_\d{6})$/,'').replace(/_/g,'.');
 
@@ -835,11 +836,15 @@ function reportGroup(runs) {
   }
 
   const cards = runs.map((r, i) => reportCard(r, appName, i > 0)).join('');
+  const compareBtn = `<button class="btn-ghost btn-compare" onclick="event.stopPropagation();openCompareModal('${groupKey}')">⇄ Compare</button>`;
   return `
     <div class="report-group report-group-multi">
       <div class="group-header">
         <span class="group-app-name">${appName}</span>
-        <span class="group-run-count">${runs.length} analyses</span>
+        <div class="group-header-right">
+          <span class="group-run-count">${runs.length} analyses</span>
+          ${compareBtn}
+        </div>
       </div>
       ${cards}
     </div>`;
@@ -945,6 +950,103 @@ function reportCard(r, appNameOverride, isOlder = false) {
         <button class="btn-icon btn-delete" title="Delete" onclick="deleteReport('${r.name}', this)">🗑</button>
       </div>
     </div>`;
+}
+
+// ─── Compare versions ─────────────────────────────────────────────────────────
+
+function openCompareModal(groupKey) {
+  const runs = (state.reportGroups && state.reportGroups[groupKey]) || [];
+  if (runs.length < 2) return;
+
+  const options = runs.map(r => {
+    const date = new Date(r.modified * 1000).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+    const label = `${r.version ? 'v' + r.version : 'Unversioned'} — ${date}`;
+    return `<option value="${r.name}">${label}</option>`;
+  }).join('');
+
+  $('compare-select-a').innerHTML = options;
+  $('compare-select-b').innerHTML = options;
+  // Default: compare the two most recent runs
+  $('compare-select-a').value = runs[Math.min(1, runs.length - 1)].name;
+  $('compare-select-b').value = runs[0].name;
+  $('compare-result').innerHTML = '';
+  $('compare-modal-overlay').classList.remove('hidden');
+}
+
+function hideCompareModal() {
+  $('compare-modal-overlay').classList.add('hidden');
+}
+
+async function runCompare() {
+  const a = $('compare-select-a').value;
+  const b = $('compare-select-b').value;
+  if (a === b) { toast('Choose two different analyses to compare', 'err'); return; }
+
+  $('compare-result').innerHTML = '<div class="text-muted text-sm" style="margin-top:16px">Comparing...</div>';
+  try {
+    const data = await api(`/api/reports/compare?a=${encodeURIComponent(a)}&b=${encodeURIComponent(b)}`);
+    $('compare-result').innerHTML = renderCompareResult(data);
+  } catch (e) {
+    $('compare-result').innerHTML = `<div class="text-muted text-sm" style="margin-top:16px">Failed to compare: ${e.message}</div>`;
+  }
+}
+
+function renderCompareResult(data) {
+  const fmtDate = ts => {
+    if (!ts || ts.length < 15) return '';
+    const y = ts.slice(0,4), mo = ts.slice(4,6), d = ts.slice(6,8);
+    return new Date(`${y}-${mo}-${d}`).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+  };
+
+  const sideEl = (side, label) => `
+    <div class="compare-side">
+      <div class="compare-side-label">${label}</div>
+      <div class="compare-side-version">${side.version ? 'v' + side.version : 'Unversioned'}</div>
+      <div class="compare-side-date">${fmtDate(side.timestamp)}</div>
+      <div class="compare-side-score">${side.score ?? 'N/A'}<span class="card-score-denom">/100</span></div>
+      ${side.ai_verdict_label ? `<span class="card-verdict card-verdict-${side.ai_verdict_cls}">${side.ai_verdict_label}</span>` : ''}
+    </div>`;
+
+  const scoreDeltaEl = data.score_delta != null
+    ? `<div class="compare-delta ${data.score_delta > 0 ? 'delta-up' : data.score_delta < 0 ? 'delta-down' : ''}">${data.score_delta > 0 ? '+' : ''}${data.score_delta} score</div>`
+    : '';
+
+  const sectionLabels = {
+    permissions: 'Permissions', trackers: 'Trackers', domains: 'Domains',
+    secrets: 'Secrets', code_issues: 'Code issues',
+  };
+
+  const sectionsEl = Object.entries(data.sections).map(([key, s]) => {
+    const label = sectionLabels[key] || key;
+    if (!s.available) {
+      return `<div class="compare-section"><div class="compare-section-title">${label}</div><div class="compare-nochange">Not available — one of these reports predates comparison support. Re-run it to enable this.</div></div>`;
+    }
+    if (!s.added.length && !s.removed.length) {
+      return `<div class="compare-section"><div class="compare-section-title">${label}</div><div class="compare-nochange">No changes</div></div>`;
+    }
+    const added   = s.added.map(x => `<li class="diff-added">+ ${x}</li>`).join('');
+    const removed = s.removed.map(x => `<li class="diff-removed">− ${x}</li>`).join('');
+    return `<div class="compare-section"><div class="compare-section-title">${label}</div><ul class="compare-diff-list">${added}${removed}</ul></div>`;
+  }).join('');
+
+  let apkidEl = '';
+  if (!data.apkid.available) {
+    apkidEl = `<div class="compare-section"><div class="compare-section-title">Packer & obfuscation (APKiD)</div><div class="compare-nochange">Not available for one or both reports.</div></div>`;
+  } else if (!data.apkid.changes.length) {
+    apkidEl = `<div class="compare-section"><div class="compare-section-title">Packer & obfuscation (APKiD)</div><div class="compare-nochange">No changes</div></div>`;
+  } else {
+    apkidEl = `<div class="compare-section"><div class="compare-section-title">Packer & obfuscation (APKiD)</div><ul class="compare-diff-list">${data.apkid.changes.map(c => `<li class="diff-warn">⚠ ${c}</li>`).join('')}</ul></div>`;
+  }
+
+  return `
+    <div class="compare-header">
+      ${sideEl(data.older, 'Older')}
+      <div class="compare-arrow">→ ${scoreDeltaEl}</div>
+      ${sideEl(data.newer, 'Newer')}
+    </div>
+    ${sectionsEl}
+    ${apkidEl}
+  `;
 }
 
 // ─── Re-run panel ─────────────────────────────────────────────────────────────

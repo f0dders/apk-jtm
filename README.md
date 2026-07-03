@@ -4,7 +4,7 @@
 
 # APK-JTM — Just tell me if it's dodgy!
 
-[![Version](https://img.shields.io/badge/version-v1.5.0-4ade80?style=flat-square)](https://github.com/f0dders/apk-jtm/releases)
+[![Version](https://img.shields.io/badge/version-v1.6.0-4ade80?style=flat-square)](https://github.com/f0dders/apk-jtm/releases)
 [![Licence](https://img.shields.io/badge/licence-GPL%20v3-blue?style=flat-square)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue?style=flat-square)](https://www.python.org/downloads/)
 
@@ -195,6 +195,8 @@ APKiD requires **Python 3.12** due to a native dependency. The launcher handles 
 **Load an existing MobSF report** — export the JSON from MobSF and load it directly, skipping the scan step.
 
 **Re-analyse** — the ⟳ button on any saved report re-runs AI analysis with a different model, without re-uploading the APK.
+
+**Compare versions** — when an app has 2+ saved analyses, a "⇄ Compare" button appears on its group header. Pick any two runs to see what changed: permissions, trackers, domains, secrets, code issues, and APKiD packer flags — added/removed, no re-scanning needed. Reports saved before this feature was added show "Not available" for detailed diffs until re-run.
 
 ---
 

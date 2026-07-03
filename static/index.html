@@ -209,6 +209,25 @@
   </div>
 </div>
 
+<!-- Compare versions modal -->
+<div id="compare-modal-overlay" class="modal-overlay hidden" onclick="hideCompareModal()">
+  <div class="modal-box modal-box-wide" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <div class="modal-title">Compare versions</div>
+      <button class="modal-close" onclick="hideCompareModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="compare-picker">
+        <select id="compare-select-a"></select>
+        <span class="compare-picker-arrow">→</span>
+        <select id="compare-select-b"></select>
+        <button class="btn-primary" onclick="runCompare()">Compare</button>
+      </div>
+      <div id="compare-result"></div>
+    </div>
+  </div>
+</div>
+
 <script src="/static/app.js"></script>
 </body>
 </html>

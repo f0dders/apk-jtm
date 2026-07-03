@@ -4,6 +4,23 @@ All notable changes are documented here. Versions follow [Semantic Versioning](h
 
 ---
 
+## [v1.6.0] — 2026-07-03
+
+### New features
+
+- **Compare versions** — a "⇄ Compare" button appears on any report group with 2+ analyses. Pick any two saved runs to see what changed between them: permissions, trackers, domains, secrets, and code issues (added/removed), plus APKiD packer/anti-emulator/malware-packer flag changes. Built entirely from existing report data — no re-scanning required. Older reports predating this feature show "Not available" for detailed diffs until re-run.
+- **Cache-busted static assets** — `/static/app.js` and `/static/style.css` are now served with a version-tied query string, so a browser that cached the frontend from a previous install reliably picks up new JS/CSS after an update instead of silently running stale code.
+
+### Fixes
+
+- **Uploaded APK/JSON files were never deleted after a scan** — `uploads/` had silently grown to 482MB of orphaned files, including on failed scans. Every exit path now cleans up via a `finally` block. A startup sweep also clears anything older than an hour, as a safety net for hard process kills where the normal cleanup never runs.
+
+### Internal
+
+- Added a pytest suite (44 tests) covering the pure logic modules (`extractor.py`, `apkid_client.py`, `model_tier.py`, `paths.py`) and regression tests for the upload leak and the version-comparison diff logic. Wired up GitHub Actions to run the suite on every push/PR to main.
+
+---
+
 ## [v1.5.0] — 2026-06-24
 
 ### New features

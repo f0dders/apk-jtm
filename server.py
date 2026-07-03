@@ -94,7 +94,13 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 @app.get("/", response_class=HTMLResponse)
 async def index():
-    return FileResponse("static/index.html")
+    # Cache-bust static assets with the app version, so a browser that
+    # cached JS/CSS from a previous install picks up the new files after
+    # an update instead of silently running stale frontend code.
+    html = Path("static/index.html").read_text()
+    html = html.replace('/static/app.js"', f'/static/app.js?v={VERSION}"')
+    html = html.replace('/static/style.css"', f'/static/style.css?v={VERSION}"')
+    return HTMLResponse(html)
 
 
 @app.get("/reports/{filename}")
@@ -201,6 +207,90 @@ async def list_reports():
             **meta,
         })
     return {"reports": reports}
+
+
+def _load_meta(filename: str) -> dict:
+    if ".." in filename or "/" in filename:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+    stem = filename.removesuffix(".html")
+    meta_path = REPORTS_DIR / f"{stem}.meta.json"
+    if not meta_path.exists():
+        raise HTTPException(status_code=404, detail=f"Report not found: {filename}")
+    return {"name": filename, **json.loads(meta_path.read_text())}
+
+
+def _diff_list(a: dict, b: dict, key: str) -> dict:
+    """Diff a list field between two reports. Older reports predating this
+    field are missing the key entirely — that's distinct from an empty
+    list, so comparison degrades gracefully instead of showing a false
+    'everything removed' diff."""
+    if key not in a or key not in b:
+        return {"available": False, "added": [], "removed": []}
+    a_set, b_set = set(a[key]), set(b[key])
+    return {
+        "available": True,
+        "added":   sorted(b_set - a_set),
+        "removed": sorted(a_set - b_set),
+    }
+
+
+_APKID_FLAG_LABELS = {
+    "apkid_packer":         "Packer/obfuscation",
+    "apkid_anti_vm":        "Anti-emulator technique",
+    "apkid_malware_packer": "Malware-associated packer",
+}
+
+
+def _diff_apkid(a: dict, b: dict) -> dict:
+    if not (a.get("apkid_available") and b.get("apkid_available")):
+        return {"available": False, "changes": []}
+    changes = []
+    for flag, label in _APKID_FLAG_LABELS.items():
+        a_val, b_val = bool(a.get(flag)), bool(b.get(flag))
+        if a_val != b_val:
+            changes.append(f"{label} {'now detected' if b_val else 'no longer detected'}")
+    return {"available": True, "changes": changes}
+
+
+def _compare_summary(meta: dict) -> dict:
+    return {
+        "name":             meta["name"],
+        "app_name":         meta.get("app_name", "Unknown"),
+        "version":          meta.get("version", ""),
+        "timestamp":        meta.get("timestamp", ""),
+        "score":            meta.get("score"),
+        "ai_verdict_label": meta.get("ai_verdict_label", ""),
+        "ai_verdict_cls":   meta.get("ai_verdict_cls", ""),
+    }
+
+
+@app.get("/api/reports/compare")
+async def compare_reports(a: str, b: str):
+    """Diff two saved reports of the same app. Accepts either order —
+    results are always returned oldest-first based on each report's own
+    timestamp, so the diff reads as 'what changed since then'."""
+    meta_a = _load_meta(a)
+    meta_b = _load_meta(b)
+
+    if meta_a["timestamp"] > meta_b["timestamp"]:
+        meta_a, meta_b = meta_b, meta_a
+
+    score_a, score_b = meta_a.get("score"), meta_b.get("score")
+    score_delta = (score_b - score_a) if isinstance(score_a, (int, float)) and isinstance(score_b, (int, float)) else None
+
+    return {
+        "older": _compare_summary(meta_a),
+        "newer": _compare_summary(meta_b),
+        "score_delta": score_delta,
+        "sections": {
+            "permissions":  _diff_list(meta_a, meta_b, "perms_list"),
+            "trackers":     _diff_list(meta_a, meta_b, "trackers_list"),
+            "domains":      _diff_list(meta_a, meta_b, "domains_list"),
+            "secrets":      _diff_list(meta_a, meta_b, "secrets_list"),
+            "code_issues":  _diff_list(meta_a, meta_b, "code_issues_list"),
+        },
+        "apkid": _diff_apkid(meta_a, meta_b),
+    }
 
 
 @app.delete("/api/reports/{filename}")

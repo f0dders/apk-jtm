@@ -4,11 +4,11 @@
 
 # APK-JTM — Just tell me if it's dodgy!
 
-[![Version](https://img.shields.io/badge/version-v1.9.1-4ade80?style=flat-square)](https://github.com/f0dders/apk-jtm/releases)
+[![Version](https://img.shields.io/badge/version-v1.9.2-4ade80?style=flat-square)](https://github.com/f0dders/apk-jtm/releases)
 [![Licence](https://img.shields.io/badge/licence-GPL%20v3-blue?style=flat-square)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue?style=flat-square)](https://www.python.org/downloads/)
 
-Analyses Android APKs using [MobSF](https://github.com/MobSF/Mobile-Security-Framework-MobSF) for static analysis and [APKiD](https://github.com/rednaga/APKiD) for packer/obfuscation detection, then passes the findings to an AI model to produce a plain-English security report — no pentesting background required.
+Analyses Android APKs using [MobSF](https://github.com/MobSF/Mobile-Security-Framework-MobSF) for static analysis, [APKiD](https://github.com/rednaga/APKiD) for packer/obfuscation detection, and [Quark-Engine](https://github.com/quark-engine/quark-engine) for behavioural malware-pattern matching, then passes the combined findings to an AI model to produce a plain-English security report — no pentesting background required.
 
 Supports **local AI models** (Ollama, LM Studio) for fully offline use, and **cloud AI** (Claude, OpenAI, Gemini, and more) for maximum analysis quality.
 

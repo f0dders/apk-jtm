@@ -4,6 +4,14 @@ All notable changes are documented here. Versions follow [Semantic Versioning](h
 
 ---
 
+## [v1.9.2] — 2026-07-03
+
+### Documentation
+
+- **README intro paragraph now mentions Quark-Engine** — it had described the app as MobSF + APKiD only, missed when Quark-Engine was added back in v1.7.0.
+
+---
+
 ## [v1.9.1] — 2026-07-03
 
 ### Documentation

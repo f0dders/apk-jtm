@@ -252,6 +252,18 @@ def _diff_apkid(a: dict, b: dict) -> dict:
     return {"available": True, "changes": changes}
 
 
+def _diff_quark(a: dict, b: dict) -> dict:
+    if not (a.get("quark_available") and b.get("quark_available")):
+        return {"available": False, "threat_level_changed": False, "older_level": "", "newer_level": ""}
+    level_a, level_b = a.get("quark_threat_level", ""), b.get("quark_threat_level", "")
+    return {
+        "available": True,
+        "threat_level_changed": level_a != level_b,
+        "older_level": level_a,
+        "newer_level": level_b,
+    }
+
+
 def _compare_summary(meta: dict) -> dict:
     return {
         "name":             meta["name"],
@@ -290,6 +302,7 @@ async def compare_reports(a: str, b: str):
             "code_issues":  _diff_list(meta_a, meta_b, "code_issues_list"),
         },
         "apkid": _diff_apkid(meta_a, meta_b),
+        "quark": _diff_quark(meta_a, meta_b),
     }
 
 
@@ -342,6 +355,7 @@ async def rerun_report(filename: str, payload: dict, background_tasks: Backgroun
         model_override=payload.get("model"),
         mobsf_hash=md5,
         prior_apkid=meta.get("apkid_full"),
+        prior_quark=meta.get("quark_full"),
     )
 
     return {"scan_id": scan_id}
@@ -427,6 +441,7 @@ async def run_scan(
     model_override: str | None,
     mobsf_hash: str | None = None,
     prior_apkid: dict | None = None,
+    prior_quark: dict | None = None,
 ):
     queue = _scan_queues.get(scan_id)
     if not queue:
@@ -452,8 +467,9 @@ async def run_scan(
 
         # Load or scan
         raw_report = None
-        # Re-runs reuse APKiD results from the original scan (APK unchanged)
+        # Re-runs reuse APKiD/Quark results from the original scan (APK unchanged)
         apkid_results: dict = prior_apkid if prior_apkid else {"available": False, "reason": "APKiD only runs on direct APK scans"}
+        quark_results: dict = prior_quark if prior_quark else {"available": False, "reason": "Quark-Engine only runs on direct APK scans"}
 
         if report_path:
             send("progress", {"stage": "loading", "message": "Loading MobSF report..."})
@@ -486,6 +502,12 @@ async def run_scan(
                 send("progress", {"stage": "apkid", "message": msg})
             else:
                 send("progress", {"stage": "apkid", "message": "No APKiD data from original scan (APK needed to run APKiD)"})
+            # Surface Quark-Engine stage for re-runs — reuse results from original scan
+            if quark_results.get("available"):
+                msg = f"Reusing Quark-Engine results from original scan — {quark_results.get('threat_level', 'unknown risk')}"
+                send("progress", {"stage": "quark", "message": msg})
+            else:
+                send("progress", {"stage": "quark", "message": "No Quark-Engine data from original scan (APK needed to run Quark-Engine)"})
         else:
             mobsf_url = env.get("MOBSF_URL", "http://localhost:8000")
             mobsf_key = env.get("MOBSF_API_KEY", "")
@@ -498,15 +520,18 @@ async def run_scan(
             from mobsf_client import MobSFClient
             client = MobSFClient(mobsf_url, mobsf_key)
 
-            # Run MobSF scan and APKiD in parallel
+            # Run MobSF scan, APKiD, and Quark-Engine in parallel
             from apkid_client import run_apkid
+            from quark_client import run_quark
 
             send("progress", {"stage": "apkid", "message": "Running packer/obfuscation analysis (APKiD)..."})
+            send("progress", {"stage": "quark", "message": "Running behavioural pattern analysis (Quark-Engine)..."})
 
             try:
-                raw_report, apkid_results = await asyncio.gather(
+                raw_report, apkid_results, quark_results = await asyncio.gather(
                     asyncio.to_thread(client.upload_and_scan, apk_path),
                     asyncio.to_thread(run_apkid, apk_path),
+                    asyncio.to_thread(run_quark, apk_path),
                 )
             except Exception as e:
                 send("error", {"message": f"MobSF error: {e}"})
@@ -523,6 +548,12 @@ async def run_scan(
             else:
                 send("progress", {"stage": "apkid", "message": apkid_results.get("reason", "APKiD skipped")})
 
+            if quark_results.get("available"):
+                msg = f"Quark-Engine complete — {quark_results.get('threat_level', 'unknown risk')}, {quark_results.get('matched_count', 0)} behaviours matched"
+                send("progress", {"stage": "quark", "message": msg})
+            else:
+                send("progress", {"stage": "quark", "message": quark_results.get("reason", "Quark-Engine skipped")})
+
             if raw_report.get("_cached"):
                 send("progress", {"stage": "scan", "message": "Already scanned — using cached MobSF results ⚡"})
             else:
@@ -532,6 +563,7 @@ async def run_scan(
         import extractor
         extracted = extractor.extract(raw_report)
         extracted["apkid"] = apkid_results
+        extracted["quark"] = quark_results
 
         app_info = extracted["app"]
         send("progress", {
@@ -661,6 +693,7 @@ async def run_scan(
             "manifest_issues_count": len(extracted["manifest_issues"]),
             "icon_b64": icon_b64,
             "apkid": extracted.get("apkid", {}),
+            "quark": extracted.get("quark", {}),
             "ai_provider":  provider_name,
             "ai_model":     provider.model,
             "ai_model_tier": _classify_model(provider.model),

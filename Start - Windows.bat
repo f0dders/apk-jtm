@@ -147,6 +147,22 @@ if !errorlevel! equ 0 (
     echo          To enable: install Python 3.12 and re-run this launcher
   )
 )
+
+:: ── Quark-Engine (pure Python -- no native build tools needed) ────────────────
+pip install quark-engine -q >nul 2>&1
+if !errorlevel! equ 0 (
+  if not exist "%USERPROFILE%\.quark-engine\quark-rules\rules" (
+    echo   Fetching Quark-Engine rule database ^(one-time, needs internet^)...
+    freshquark >nul 2>&1
+  )
+  if exist "%USERPROFILE%\.quark-engine\quark-rules\rules" (
+    echo   [OK] Quark-Engine ready ^(behavioural pattern analysis enabled^)
+  ) else (
+    echo   [NOTE] Quark-Engine rule database unavailable ^(no internet on first run?^) -- run 'freshquark' manually later
+  )
+) else (
+  echo   [NOTE] Quark-Engine install failed -- behavioural analysis skipped
+)
 echo.
 
 :: ── Docker ────────────────────────────────────────────────────────────────────

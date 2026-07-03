@@ -28,6 +28,9 @@ report_*.md
 # APK files
 *.apk
 
+# Quark-Engine's own daily log file (written to cwd when the `quark` CLI runs)
+*.quark.log
+
 # IDE / local tooling
 .claude/
 .DS_Store

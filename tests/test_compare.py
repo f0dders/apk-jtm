@@ -55,6 +55,30 @@ def test_diff_apkid_unavailable_if_either_side_lacks_apkid():
     assert result == {"available": False, "changes": []}
 
 
+def test_diff_quark_flags_threat_level_change():
+    a = {"quark_available": True, "quark_threat_level": "Low Risk"}
+    b = {"quark_available": True, "quark_threat_level": "High Risk"}
+    result = server._diff_quark(a, b)
+    assert result == {
+        "available": True, "threat_level_changed": True,
+        "older_level": "Low Risk", "newer_level": "High Risk",
+    }
+
+
+def test_diff_quark_no_change():
+    a = {"quark_available": True, "quark_threat_level": "Low Risk"}
+    b = {"quark_available": True, "quark_threat_level": "Low Risk"}
+    result = server._diff_quark(a, b)
+    assert result["threat_level_changed"] is False
+
+
+def test_diff_quark_unavailable_if_either_side_lacks_quark():
+    a = {"quark_available": False}
+    b = {"quark_available": True, "quark_threat_level": "High Risk"}
+    result = server._diff_quark(a, b)
+    assert result["available"] is False
+
+
 def test_compare_summary_pulls_expected_fields():
     meta = {
         "name": "report_x.html", "app_name": "Aurora Store", "version": "4.4.2",

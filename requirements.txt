@@ -23,3 +23,9 @@ google-generativeai>=0.7.0
 # apkid is installed separately by the launcher (optional — requires native build tools;
 # may fail on Python 3.14+ until upstream yara-python-dex adds wheels for it)
 # To install manually: pip install apkid
+#
+# quark-engine is installed separately by the launcher (optional — pure Python,
+# no native build tools needed, but pulls in a fairly heavy dependency tree:
+# androguard, plotly, graphviz, r2pipe/rzpipe). Its rule database is fetched
+# once via `freshquark`, then every scan runs fully offline against the local copy.
+# To install manually: pip install quark-engine && freshquark

@@ -481,6 +481,7 @@ const STAGE_LABELS = {
   loading:   'Loading MobSF report',
   upload:    'Uploading to MobSF',
   apkid:     'Packer & obfuscation check',
+  quark:     'Behavioural pattern analysis',
   scan:      'Scanning APK',
   extract:   'Extracting findings',
   extracted: 'Findings extracted',
@@ -521,6 +522,7 @@ function streamProgress(scanId) {
     provider:  '',          // keep "Using claude / …" as-is
     upload:    'Uploaded',
     apkid:     '',          // keep APKiD result text as-is
+    quark:     '',          // keep Quark-Engine result text as-is
     scan:      '',          // keep "Scan complete." / "Using cached…" as-is
     extract:   'Done',
     extracted: '',
@@ -908,13 +910,22 @@ function reportCard(r, appNameOverride, isOlder = false) {
     // Clean APKiD result needs no badge — covered by the single green verdict pill below
   }
 
+  // Quark-Engine pill — behavioural threat level is mechanical and noisy
+  // (even legitimate apps often land on Moderate/High), so this is framed
+  // as neutral info, never an alarm colour — the AI report gives context.
+  let quarkEl = '';
+  if (r.quark_available && r.quark_threat_level && r.quark_threat_level !== 'Low Risk') {
+    quarkEl = `<span class="card-quark card-quark-info" title="Quark-Engine matched ${r.quark_matched_count || 0} behaviour pattern(s) — see report for context">🧬 Behaviour: ${r.quark_threat_level}</span>`;
+  }
+
   // Consolidated status: single green pill when everything is clear,
-  // otherwise show verdict + any APKiD warnings separately
+  // otherwise show verdict + any APKiD/Quark warnings separately
   const apkidAllClear = r.apkid_available && !r.apkid_packer && !r.apkid_anti_vm && !r.apkid_malware_packer;
-  const allClear = vKey === 'LOW' && (apkidAllClear || !r.apkid_available);
+  const quarkAllClear = !r.quark_available || !r.quark_threat_level || r.quark_threat_level === 'Low Risk';
+  const allClear = vKey === 'LOW' && (apkidAllClear || !r.apkid_available) && quarkAllClear;
   const statusEl = allClear
     ? `<span class="card-verdict card-verdict-safe">✓ Safe to use</span>`
-    : `${verdictEl}${apkidEl}`;
+    : `${verdictEl}${apkidEl}${quarkEl}`;
 
   // Older runs: collapsed single-row view
   if (isOlder) {
@@ -1038,6 +1049,15 @@ function renderCompareResult(data) {
     apkidEl = `<div class="compare-section"><div class="compare-section-title">Packer & obfuscation (APKiD)</div><ul class="compare-diff-list">${data.apkid.changes.map(c => `<li class="diff-warn">⚠ ${c}</li>`).join('')}</ul></div>`;
   }
 
+  let quarkEl = '';
+  if (!data.quark.available) {
+    quarkEl = `<div class="compare-section"><div class="compare-section-title">Behavioural analysis (Quark-Engine)</div><div class="compare-nochange">Not available for one or both reports.</div></div>`;
+  } else if (!data.quark.threat_level_changed) {
+    quarkEl = `<div class="compare-section"><div class="compare-section-title">Behavioural analysis (Quark-Engine)</div><div class="compare-nochange">No change — still ${data.quark.newer_level}</div></div>`;
+  } else {
+    quarkEl = `<div class="compare-section"><div class="compare-section-title">Behavioural analysis (Quark-Engine)</div><ul class="compare-diff-list"><li class="diff-warn">⚠ Threat level changed: ${data.quark.older_level} → ${data.quark.newer_level}</li></ul></div>`;
+  }
+
   return `
     <div class="compare-header">
       ${sideEl(data.older, 'Older')}
@@ -1046,6 +1066,7 @@ function renderCompareResult(data) {
     </div>
     ${sectionsEl}
     ${apkidEl}
+    ${quarkEl}
   `;
 }
 

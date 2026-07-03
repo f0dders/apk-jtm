@@ -4,7 +4,7 @@
 
 # APK-JTM — Just tell me if it's dodgy!
 
-[![Version](https://img.shields.io/badge/version-v1.6.0-4ade80?style=flat-square)](https://github.com/f0dders/apk-jtm/releases)
+[![Version](https://img.shields.io/badge/version-v1.7.0-4ade80?style=flat-square)](https://github.com/f0dders/apk-jtm/releases)
 [![Licence](https://img.shields.io/badge/licence-GPL%20v3-blue?style=flat-square)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue?style=flat-square)](https://www.python.org/downloads/)
 
@@ -37,6 +37,7 @@ Drop an APK file onto the app. Within a few minutes you get a structured report 
 | **Privacy concerns** | What personal data can this app access or collect? |
 | **Network & data activity** | Where does the app send data? Flagged domains, trackers |
 | **Geographic analysis** | Which countries host the servers? Strong privacy laws or state surveillance risk? |
+| **Behavioural analysis** | Did Quark-Engine match any known malware-family behaviour patterns? |
 | **Red flags** | Unambiguous signs of malicious behaviour or spyware |
 | **Verdict & recommendations** | Clear actions: Install / Avoid / Monitor / Restrict |
 
@@ -120,8 +121,9 @@ Double-click the launcher for your operating system:
 1. Check for Python 3.12 and offer to install it if needed
 2. Create an isolated Python environment and install dependencies
 3. Optionally install APKiD for packer analysis (Python 3.12 required)
-4. Start MobSF via Docker
-5. Open the app in your browser at `http://localhost:7842`
+4. Install Quark-Engine for behavioural analysis and fetch its rule database (needs internet once)
+5. Start MobSF via Docker
+6. Open the app in your browser at `http://localhost:7842`
 
 Subsequent launches are fast — the setup only runs once.
 
@@ -188,9 +190,19 @@ APKiD requires **Python 3.12** due to a native dependency. The launcher handles 
 
 ---
 
+## Quark-Engine behavioural analysis
+
+[Quark-Engine](https://github.com/quark-engine/quark-engine) runs in parallel with MobSF and APKiD, matching API-call patterns against a database of ~280 community rules covering known malware-family behaviours — banking trojans, spyware, persistence/evasion techniques, and more.
+
+Unlike APKiD's malware-packer detection, Quark's "threat level" is a mechanical score with no awareness of what an app actually is — many legitimate apps (system tools, package managers) trigger a Moderate or High threat level purely because they use APIs also common in malware. The AI is instructed to weigh each matched behaviour in context rather than trust the threat level blindly, exactly as it does for permissions and other findings.
+
+Quark-Engine is pure Python — no native build tools required, unlike APKiD. Its rule database is fetched once via `freshquark` (needs internet for that one step), then every scan runs entirely offline against the local copy. The launcher handles installation and the initial rule fetch automatically; if it can't be installed or the rules aren't available, the scan continues normally without behavioural analysis.
+
+---
+
 ## Scanning options
 
-**Scan a new APK** — drag and drop an `.apk` file. MobSF scans it, APKiD runs in parallel, and the combined findings are passed to the AI.
+**Scan a new APK** — drag and drop an `.apk` file. MobSF scans it, with APKiD and Quark-Engine running in parallel, and the combined findings are passed to the AI.
 
 **Load an existing MobSF report** — export the JSON from MobSF and load it directly, skipping the scan step.
 
@@ -244,6 +256,8 @@ Close the terminal window that opened when you launched the app. MobSF continues
 **"Could not connect to MobSF"** — make sure Docker Desktop is running and MobSF has fully started (30–60 seconds on first launch). Check `http://localhost:8000`.
 
 **APKiD not working** — requires Python 3.12. Run the launcher and it will offer to install it.
+
+**Quark-Engine not working / no behavioural analysis** — usually means `freshquark` couldn't fetch its rule database (needs internet for that one-time step). Run `freshquark` manually, then re-launch.
 
 **Ollama model not found** — run `ollama pull <model-name>` in a terminal before launching.
 

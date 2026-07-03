@@ -344,6 +344,10 @@ def save_report(app_info: dict, ai_report: str, output_dir: str = ".") -> str:
         "apkid_anti_vm":    app_info.get("apkid", {}).get("has_anti_vm", False),
         "apkid_malware_packer": app_info.get("apkid", {}).get("known_malware_packer", False),
         "apkid_full":       app_info.get("apkid", {}),
+        "quark_available":     app_info.get("quark", {}).get("available", False),
+        "quark_threat_level":  app_info.get("quark", {}).get("threat_level", ""),
+        "quark_matched_count": app_info.get("quark", {}).get("matched_count", 0),
+        "quark_full":          app_info.get("quark", {}),
     }, indent=2))
 
     return str(html_path)

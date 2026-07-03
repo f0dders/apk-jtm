@@ -270,6 +270,8 @@ select option { background: var(--surface2); }
 .card-apkid-warn   { background: #fff7ed; color: #c2410c; }
 .card-apkid-info   { background: #eff6ff; color: #1d4ed8; }
 .card-apkid-clean  { background: #f0fdf4; color: #166534; }
+.card-quark { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 12px; border-radius: 99px; margin-left: 6px; vertical-align: middle; }
+.card-quark-info { background: #eff6ff; color: #1d4ed8; }
 .card-date { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
 .card-model { display: flex; align-items: center; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
 .card-tier-badge { font-size: 10px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: #fff; padding: 2px 8px; border-radius: 99px; flex-shrink: 0; }

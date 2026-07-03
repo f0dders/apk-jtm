@@ -107,6 +107,19 @@ def build_analysis_prompt(extracted: dict) -> str:
     elif apkid.get("available") is False and not apkid.get("reason", "").startswith("APKiD not installed"):
         sections.append(f"## Packer & Obfuscation Analysis (APKiD)\n- APKiD scan failed: {apkid.get('reason', 'unknown error')}")
 
+    quark = extracted.get("quark", {})
+    if quark.get("available"):
+        if quark.get("top_crimes"):
+            lines = [f"- **Quark-Engine threat level:** {quark.get('threat_level', 'Unknown')} ({quark.get('matched_count', 0)} behaviour patterns matched at ≥80% confidence)"]
+            for c in quark["top_crimes"]:
+                labels = f" _(tags: {', '.join(c['label'])})_" if c.get("label") else ""
+                lines.append(f"- {c['crime']} — confidence {c['confidence']}{labels}")
+            sections.append("## Behavioural Analysis (Quark-Engine)\n" + "\n".join(lines))
+        else:
+            sections.append(f"## Behavioural Analysis (Quark-Engine)\n- **Clean:** No malware-associated behaviour patterns matched. Threat level: {quark.get('threat_level', 'Low Risk')}.")
+    elif quark.get("available") is False and not quark.get("reason", "").startswith(("Quark-Engine not installed", "Quark-Engine rules not found")):
+        sections.append(f"## Behavioural Analysis (Quark-Engine)\n- Quark-Engine scan failed: {quark.get('reason', 'unknown error')}")
+
     locations = net.get("server_locations", {})
     if locations:
         loc_lines = "\n".join(
@@ -190,6 +203,19 @@ Cover:
 - If everything is clean: say so plainly — "No packers, obfuscators, or evasion techniques detected; standard compiler toolchain."
 
 Keep this section to 2–4 bullet points. If APKiD data is not present, omit this section entirely.
+
+## Behavioural Analysis
+Only include this section if Quark-Engine data is present above. Quark-Engine matches API-call patterns against a database of behaviours associated with known malware families (banking trojans, spyware, persistence/evasion techniques, etc).
+
+**Important — do not blindly trust the threat level:** Quark-Engine's "threat level" is a mechanical score based on how many behaviour patterns matched, with no awareness of what the app actually is. Many completely legitimate apps — especially system tools, package managers, and apps with broad permissions for a good reason — trigger a "High Risk" or "Moderate Risk" threat level purely because they use APIs (reflection, content resolvers, background services) that are also used by malware. Unlike the APKiD malware-packer rule, **there is no mandatory verdict escalation tied to Quark's threat level** — you must reason about each matched behaviour in context, exactly as you do for permissions and code findings elsewhere in this report.
+
+Cover:
+- List the matched behaviours that are genuinely noteworthy given what this app is — mark any that are expected/benign for this app type as *(expected for this app type)*
+- If a matched behaviour combination looks like a real red flag (e.g. reading SMS + sending network requests + hiding the app icon, in an app with no legitimate reason to do so), call it out clearly and factor it into your verdict
+- If everything matched is explainable by the app's normal function, say so plainly — do not manufacture concern from mechanical pattern matches
+- If no behaviours matched (clean): say so plainly — "No malware-associated behaviour patterns detected."
+
+Keep this section to 2–4 bullet points. If Quark-Engine data is not present, omit this section entirely.
 
 ## Red Flags
 Unambiguous list of anything that suggests malicious behaviour, spyware, or dangerously poor security practice — **after accounting for the app's known purpose**. If the app is unknown or unverifiable, list that explicitly as a red flag. If nothing rises to this level, write one sentence: "No significant red flags identified."

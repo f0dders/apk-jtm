@@ -4,6 +4,23 @@ All notable changes are documented here. Versions follow [Semantic Versioning](h
 
 ---
 
+## [v1.7.0] — 2026-07-03
+
+### New features
+
+- **Quark-Engine behavioural analysis** — runs in parallel with MobSF and APKiD on every new APK scan. Matches API-call patterns against ~280 community rules covering known malware-family behaviours (banking trojans, spyware, persistence/evasion techniques). Pure Python, no native build tools required — its rule database is fetched once via `freshquark` (needs internet for that one step), then every scan runs fully offline against the local copy. The AI is explicitly instructed not to blindly trust Quark's mechanical "threat level" — many legitimate apps trigger Moderate/High purely from using APIs also common in malware — and instead reasons about each matched behaviour in context.
+- **Report cards show a Quark badge** when the threat level is above Low Risk — styled as neutral info (never an alarm colour), since the signal is noisy on its own and the AI report gives the real context.
+- **Version comparison now covers Quark too** — the "⇄ Compare" feature added in v1.6.0 diffs threat-level changes between two saved scans of the same app, alongside permissions/trackers/domains/secrets/code issues/APKiD.
+- Re-runs reuse Quark-Engine results from the original scan, same as APKiD — no APK needed to re-analyse with a different AI model.
+
+### Internal
+
+- Added `quark_client.py` (parses Quark's raw JSON — which includes every one of ~280 rules checked, matched or not — down to genuine ≥80%-confidence matches, sorted by weight).
+- 12 new tests covering the parser and its error paths (missing binary, missing rule database, timeout).
+- All three launchers (Mac/Linux/Windows) and the dev launcher install Quark-Engine and run `freshquark` during first-run setup.
+
+---
+
 ## [v1.6.0] — 2026-07-03
 
 ### New features

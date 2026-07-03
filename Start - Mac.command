@@ -153,6 +153,21 @@ else
     echo "        To enable: brew install python@3.12  (then re-run this launcher)"
   fi
 fi
+
+# ── Quark-Engine (pure Python — no native build tools needed) ─────────────────
+if pip install quark-engine -q 2>/dev/null; then
+  if [ ! -d "$HOME/.quark-engine/quark-rules/rules" ]; then
+    echo -e "  ${CYAN}Fetching Quark-Engine rule database (one-time, needs internet)...${RESET}"
+    freshquark &>/dev/null || true
+  fi
+  if [ -d "$HOME/.quark-engine/quark-rules/rules" ]; then
+    echo -e "  ${GREEN}✓${RESET} Quark-Engine ready (behavioural pattern analysis enabled)"
+  else
+    echo -e "  ${YELLOW}Note:${RESET} Quark-Engine rule database unavailable (no internet on first run?) — run 'freshquark' manually later"
+  fi
+else
+  echo -e "  ${YELLOW}Note:${RESET} Quark-Engine install failed — behavioural analysis skipped"
+fi
 echo ""
 
 # ── Docker ────────────────────────────────────────────────────────────────────

@@ -71,6 +71,44 @@
       </div>
     </div>
 
+    <!-- ── Settings (returning users) ────────────────────────────────────── -->
+    <div id="view-settings" class="hidden">
+      <div class="settings-page">
+        <h2>Settings</h2>
+        <div class="text-muted" style="margin-bottom:20px">Update your MobSF connection and AI provider — changes save immediately.</div>
+
+        <div class="card settings-section">
+          <div class="settings-section-title">MobSF Connection</div>
+          <div class="field">
+            <label>MobSF URL</label>
+            <input id="set-mobsf-url" type="text" placeholder="http://localhost:8000">
+            <div class="field-hint">Run MobSF with Docker: <code>mkdir -p ~/.mobsf && docker run -d --name mobsf -p 8000:8000 -v ~/.mobsf:/home/mobsf/.MobSF opensecurity/mobile-security-framework-mobsf</code></div>
+          </div>
+          <div class="field">
+            <label>MobSF API Key</label>
+            <input id="set-mobsf-key" type="password" placeholder="Paste your API key from MobSF → REST API">
+            <div class="field-hint" id="set-mobsf-key-hint"></div>
+          </div>
+        </div>
+
+        <div class="card settings-section">
+          <div class="settings-section-title">AI Provider</div>
+          <div class="provider-grid" id="settings-provider-grid"></div>
+        </div>
+
+        <div class="card settings-section">
+          <div class="settings-section-title" id="settings-provider-fields-title">Configure</div>
+          <div id="settings-provider-fields"></div>
+        </div>
+
+        <div class="settings-actions">
+          <button class="btn-primary" onclick="saveSettingsConfig()">Save Settings</button>
+        </div>
+
+        <div class="wizard-version" id="settings-version-line">Loading version…</div>
+      </div>
+    </div>
+
     <!-- ── Scan ───────────────────────────────────────────────────────────── -->
     <div id="view-scan" class="hidden">
       <div class="flex items-center justify-between" style="margin-bottom:24px">

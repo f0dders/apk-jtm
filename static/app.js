@@ -100,13 +100,14 @@ function skipToApp() {
 // ─── View routing ─────────────────────────────────────────────────────────────
 function setView(view) {
   state.view = view;
-  ['view-loading','view-wizard','view-scan','view-progress','view-report','view-history']
+  ['view-loading','view-wizard','view-scan','view-progress','view-report','view-history','view-settings']
     .forEach(id => hide(id));
   show(`view-${view}`);
 
-  if (view === 'wizard') renderWizard();
-  if (view === 'scan')   renderScan();
-  if (view === 'history') loadHistory();
+  if (view === 'wizard')   renderWizard();
+  if (view === 'scan')     renderScan();
+  if (view === 'history')  loadHistory();
+  if (view === 'settings') renderSettings();
 }
 
 // ─── Wizard ───────────────────────────────────────────────────────────────────
@@ -155,10 +156,9 @@ function renderWizardStep() {
   if (!body) return;
 
   if (state.wizardStep === 1) {
-    const isSettings = !!state.config.configured;
     body.innerHTML = `
-      <div class="wizard-title">${isSettings ? 'Settings' : 'Welcome to APK-JTM'}</div>
-      <div class="wizard-subtitle">${isSettings ? 'Update your MobSF connection and AI provider settings below.' : 'Let\'s get you set up in 3 quick steps. First, enter your MobSF details.'}</div>
+      <div class="wizard-title">Welcome to APK-JTM</div>
+      <div class="wizard-subtitle">Let's get you set up in 3 quick steps. First, enter your MobSF details.</div>
       <div class="field">
         <label>MobSF URL</label>
         <input id="wiz-mobsf-url" type="text" value="${state.config.mobsf_url || 'http://localhost:8000'}" placeholder="http://localhost:8000">
@@ -171,23 +171,7 @@ function renderWizardStep() {
                placeholder="Paste your API key from MobSF → REST API">
         <div class="field-hint">${state.config.mobsf_key_set ? '✓ Key saved — leave blank to keep existing key.' : 'Find it at http://localhost:8000 → top-right menu → REST API'}</div>
       </div>
-      <div class="wizard-version" id="wizard-version-line">Loading version…</div>
     `;
-    // Fetch version + data dir asynchronously and inject
-    Promise.all([
-      fetch('/api/version').then(r => r.json()),
-      fetch('/api/data-dir').then(r => r.json()),
-    ]).then(([{ version }, { data_dir }]) => {
-      const el = $('wizard-version-line');
-      if (!el) return;
-      const updateNote = state.latestVersion
-        ? ` — <a href="#" onclick="showUpdateModal();return false" style="color:var(--accent)">v${state.latestVersion} available</a>`
-        : '';
-      el.innerHTML = `APK-JTM v${version}${updateNote}<br><span class="wizard-data-dir" title="Your config and reports are stored here">Data: ${data_dir}</span>`;
-    }).catch(() => {
-      const el = $('wizard-version-line');
-      if (el) el.textContent = '';
-    });
   }
 
   if (state.wizardStep === 2) {
@@ -211,121 +195,162 @@ function renderWizardStep() {
   }
 
   if (state.wizardStep === 3) {
-    const p = state.selectedProvider;
-    const cfg = state.config;
-    let fields = '';
-
-    if (p === 'ollama') {
-      fields = `
-        <div class="field">
-          <label>Ollama URL</label>
-          <input id="wiz-ollama-url" type="text" value="${cfg.ollama_url || 'http://localhost:11434'}">
-        </div>
-        <div class="field">
-          <label>Model</label>
-          <input id="wiz-ollama-model" type="text" value="${cfg.ollama_model || DEFAULT_MODELS.ollama}" placeholder="qwen2.5-coder:32b">
-          <div class="field-hint">Install with: <code>ollama pull qwen2.5-coder:32b</code></div>
-        </div>
-      `;
-    } else if (p === 'lmstudio') {
-      fields = `
-        <div class="field">
-          <label>LM Studio Server URL</label>
-          <input id="wiz-lmstudio-url" type="text" value="${cfg.lmstudio_url || 'http://localhost:1234'}">
-          <div class="field-hint">Start the server in LM Studio → Local Server tab</div>
-        </div>
-        <div class="field">
-          <label>Model name</label>
-          <input id="wiz-lmstudio-model" type="text" value="${cfg.lmstudio_model || ''}" placeholder="Must match the model loaded in LM Studio">
-        </div>
-      `;
-    } else if (p === 'claude') {
-      fields = `
-        <div class="field">
-          <label>Anthropic API Key</label>
-          <input id="wiz-anthropic-key" type="password" placeholder="sk-ant-..." value="${cfg.claude_key_set ? '••••••••' : ''}">
-          <div class="field-hint">Get a key at console.anthropic.com</div>
-        </div>
-        <div class="field">
-          <label>Model</label>
-          <input id="wiz-claude-model" type="text" value="${cfg.claude_model || DEFAULT_MODELS.claude}">
-        </div>
-      `;
-    } else if (p === 'openai') {
-      fields = `
-        <div class="field">
-          <label>OpenAI API Key</label>
-          <input id="wiz-openai-key" type="password" placeholder="sk-..." value="${cfg.openai_key_set ? '••••••••' : ''}">
-          <div class="field-hint">Get a key at platform.openai.com/api-keys</div>
-        </div>
-        <div class="field">
-          <label>Model</label>
-          <input id="wiz-openai-model" type="text" value="${cfg.openai_model || DEFAULT_MODELS.openai}">
-        </div>
-      `;
-    } else if (p === 'gemini') {
-      fields = `
-        <div class="field">
-          <label>Google Gemini API Key</label>
-          <input id="wiz-gemini-key" type="password" placeholder="AIza..." value="${cfg.gemini_key_set ? '••••••••' : ''}">
-          <div class="field-hint">Get a key at aistudio.google.com/app/apikey</div>
-        </div>
-        <div class="field">
-          <label>Model</label>
-          <input id="wiz-gemini-model" type="text" value="${cfg.gemini_model || DEFAULT_MODELS.gemini}">
-        </div>
-      `;
-    } else if (p === 'groq') {
-      fields = `
-        <div class="field">
-          <label>Groq API Key</label>
-          <input id="wiz-groq-key" type="password" placeholder="gsk_..." value="${cfg.groq_key_set ? '••••••••' : ''}">
-          <div class="field-hint">Free tier available at <strong>console.groq.com</strong> — no credit card required</div>
-        </div>
-        <div class="field">
-          <label>Model</label>
-          <input id="wiz-groq-model" type="text" value="${cfg.groq_model || DEFAULT_MODELS.groq}">
-          <div class="field-hint">Fast options: openai/gpt-oss-120b (flagship) · openai/gpt-oss-20b (fastest/cheapest) · llama-3.3-70b-versatile (deprecated — migrate away)</div>
-        </div>
-      `;
-    } else if (p === 'mistral') {
-      fields = `
-        <div class="field">
-          <label>Mistral API Key</label>
-          <input id="wiz-mistral-key" type="password" placeholder="..." value="${cfg.mistral_key_set ? '••••••••' : ''}">
-          <div class="field-hint">Get a key at <strong>console.mistral.ai</strong></div>
-        </div>
-        <div class="field">
-          <label>Model</label>
-          <input id="wiz-mistral-model" type="text" value="${cfg.mistral_model || DEFAULT_MODELS.mistral}">
-          <div class="field-hint">Recommended: mistral-large-latest · codestral-latest (code-focused)</div>
-        </div>
-      `;
-    } else if (p === 'openrouter') {
-      fields = `
-        <div class="field">
-          <label>OpenRouter API Key</label>
-          <input id="wiz-openrouter-key" type="password" placeholder="sk-or-..." value="${cfg.openrouter_key_set ? '••••••••' : ''}">
-          <div class="field-hint">Get a key at <strong>openrouter.ai/keys</strong> — access 100+ models with one key</div>
-        </div>
-        <div class="field">
-          <label>Model</label>
-          <input id="wiz-openrouter-model" type="text" value="${cfg.openrouter_model || DEFAULT_MODELS.openrouter}">
-          <div class="field-hint">Use the full <code>provider/model</code> slug from openrouter.ai/models, e.g. <code>anthropic/claude-sonnet-5</code> · <code>openai/gpt-5.5</code> · <code>meta-llama/llama-3.3-70b-instruct:free</code></div>
-        </div>
-        <div class="info-box">
-          ⏱ <strong>Free-tier models can be slow.</strong> Large models (200B+) may take 2–5 minutes to respond, or time out under heavy load. For reliable speed, try <code>meta-llama/llama-3.3-70b-instruct:free</code> or a paid model.
-        </div>
-      `;
-    }
-
-    const pName = PROVIDERS.find(x => x.id === p)?.name || p;
+    const pName = PROVIDERS.find(x => x.id === state.selectedProvider)?.name || state.selectedProvider;
     body.innerHTML = `
       <div class="wizard-title">Configure ${pName}</div>
       <div class="wizard-subtitle">Almost done. Fill in the connection details for ${pName}.</div>
-      ${fields}
+      ${buildProviderConfigFields('wiz', state.selectedProvider, state.config)}
     `;
   }
+}
+
+// Shared by the onboarding wizard (step 3) and the Settings page — same
+// fields, different ID prefix so both can exist without colliding.
+function buildProviderConfigFields(prefix, p, cfg) {
+  if (p === 'ollama') {
+    return `
+      <div class="field">
+        <label>Ollama URL</label>
+        <input id="${prefix}-ollama-url" type="text" value="${cfg.ollama_url || 'http://localhost:11434'}">
+      </div>
+      <div class="field">
+        <label>Model</label>
+        <input id="${prefix}-ollama-model" type="text" value="${cfg.ollama_model || DEFAULT_MODELS.ollama}" placeholder="qwen2.5-coder:32b">
+        <div class="field-hint">Install with: <code>ollama pull qwen2.5-coder:32b</code></div>
+      </div>
+    `;
+  } else if (p === 'lmstudio') {
+    return `
+      <div class="field">
+        <label>LM Studio Server URL</label>
+        <input id="${prefix}-lmstudio-url" type="text" value="${cfg.lmstudio_url || 'http://localhost:1234'}">
+        <div class="field-hint">Start the server in LM Studio → Local Server tab</div>
+      </div>
+      <div class="field">
+        <label>Model name</label>
+        <input id="${prefix}-lmstudio-model" type="text" value="${cfg.lmstudio_model || ''}" placeholder="Must match the model loaded in LM Studio">
+      </div>
+    `;
+  } else if (p === 'claude') {
+    return `
+      <div class="field">
+        <label>Anthropic API Key</label>
+        <input id="${prefix}-anthropic-key" type="password" placeholder="sk-ant-..." value="${cfg.claude_key_set ? '••••••••' : ''}">
+        <div class="field-hint">Get a key at console.anthropic.com</div>
+      </div>
+      <div class="field">
+        <label>Model</label>
+        <input id="${prefix}-claude-model" type="text" value="${cfg.claude_model || DEFAULT_MODELS.claude}">
+      </div>
+    `;
+  } else if (p === 'openai') {
+    return `
+      <div class="field">
+        <label>OpenAI API Key</label>
+        <input id="${prefix}-openai-key" type="password" placeholder="sk-..." value="${cfg.openai_key_set ? '••••••••' : ''}">
+        <div class="field-hint">Get a key at platform.openai.com/api-keys</div>
+      </div>
+      <div class="field">
+        <label>Model</label>
+        <input id="${prefix}-openai-model" type="text" value="${cfg.openai_model || DEFAULT_MODELS.openai}">
+      </div>
+    `;
+  } else if (p === 'gemini') {
+    return `
+      <div class="field">
+        <label>Google Gemini API Key</label>
+        <input id="${prefix}-gemini-key" type="password" placeholder="AIza..." value="${cfg.gemini_key_set ? '••••••••' : ''}">
+        <div class="field-hint">Get a key at aistudio.google.com/app/apikey</div>
+      </div>
+      <div class="field">
+        <label>Model</label>
+        <input id="${prefix}-gemini-model" type="text" value="${cfg.gemini_model || DEFAULT_MODELS.gemini}">
+      </div>
+    `;
+  } else if (p === 'groq') {
+    return `
+      <div class="field">
+        <label>Groq API Key</label>
+        <input id="${prefix}-groq-key" type="password" placeholder="gsk_..." value="${cfg.groq_key_set ? '••••••••' : ''}">
+        <div class="field-hint">Free tier available at <strong>console.groq.com</strong> — no credit card required</div>
+      </div>
+      <div class="field">
+        <label>Model</label>
+        <input id="${prefix}-groq-model" type="text" value="${cfg.groq_model || DEFAULT_MODELS.groq}">
+        <div class="field-hint">Fast options: openai/gpt-oss-120b (flagship) · openai/gpt-oss-20b (fastest/cheapest) · llama-3.3-70b-versatile (deprecated — migrate away)</div>
+      </div>
+    `;
+  } else if (p === 'mistral') {
+    return `
+      <div class="field">
+        <label>Mistral API Key</label>
+        <input id="${prefix}-mistral-key" type="password" placeholder="..." value="${cfg.mistral_key_set ? '••••••••' : ''}">
+        <div class="field-hint">Get a key at <strong>console.mistral.ai</strong></div>
+      </div>
+      <div class="field">
+        <label>Model</label>
+        <input id="${prefix}-mistral-model" type="text" value="${cfg.mistral_model || DEFAULT_MODELS.mistral}">
+        <div class="field-hint">Recommended: mistral-large-latest · codestral-latest (code-focused)</div>
+      </div>
+    `;
+  } else if (p === 'openrouter') {
+    return `
+      <div class="field">
+        <label>OpenRouter API Key</label>
+        <input id="${prefix}-openrouter-key" type="password" placeholder="sk-or-..." value="${cfg.openrouter_key_set ? '••••••••' : ''}">
+        <div class="field-hint">Get a key at <strong>openrouter.ai/keys</strong> — access 100+ models with one key</div>
+      </div>
+      <div class="field">
+        <label>Model</label>
+        <input id="${prefix}-openrouter-model" type="text" value="${cfg.openrouter_model || DEFAULT_MODELS.openrouter}">
+        <div class="field-hint">Use the full <code>provider/model</code> slug from openrouter.ai/models, e.g. <code>anthropic/claude-sonnet-5</code> · <code>openai/gpt-5.5</code> · <code>meta-llama/llama-3.3-70b-instruct:free</code></div>
+      </div>
+      <div class="info-box">
+        ⏱ <strong>Free-tier models can be slow.</strong> Large models (200B+) may take 2–5 minutes to respond, or time out under heavy load. For reliable speed, try <code>meta-llama/llama-3.3-70b-instruct:free</code> or a paid model.
+      </div>
+    `;
+  }
+  return '';
+}
+
+// Shared payload builder — reads whichever prefix's fields are on screen
+// and returns the provider-specific portion of the /api/config payload.
+function buildConfigPayload(prefix, p) {
+  const g = id => document.getElementById(`${prefix}-${id}`)?.value?.trim();
+  const payload = {};
+
+  if (p === 'ollama') {
+    payload.OLLAMA_URL = g('ollama-url') || 'http://localhost:11434';
+    payload.OLLAMA_MODEL = g('ollama-model') || DEFAULT_MODELS.ollama;
+  } else if (p === 'lmstudio') {
+    payload.LM_STUDIO_URL = g('lmstudio-url') || 'http://localhost:1234';
+    payload.LM_STUDIO_MODEL = g('lmstudio-model') || '';
+  } else if (p === 'claude') {
+    const key = g('anthropic-key');
+    if (key && !key.startsWith('•')) payload.ANTHROPIC_API_KEY = key;
+    payload.CLAUDE_MODEL = g('claude-model') || DEFAULT_MODELS.claude;
+  } else if (p === 'openai') {
+    const key = g('openai-key');
+    if (key && !key.startsWith('•')) payload.OPENAI_API_KEY = key;
+    payload.OPENAI_MODEL = g('openai-model') || DEFAULT_MODELS.openai;
+  } else if (p === 'gemini') {
+    const key = g('gemini-key');
+    if (key && !key.startsWith('•')) payload.GEMINI_API_KEY = key;
+    payload.GEMINI_MODEL = g('gemini-model') || DEFAULT_MODELS.gemini;
+  } else if (p === 'groq') {
+    const key = g('groq-key');
+    if (key && !key.startsWith('•')) payload.GROQ_API_KEY = key;
+    payload.GROQ_MODEL = g('groq-model') || DEFAULT_MODELS.groq;
+  } else if (p === 'mistral') {
+    const key = g('mistral-key');
+    if (key && !key.startsWith('•')) payload.MISTRAL_API_KEY = key;
+    payload.MISTRAL_MODEL = g('mistral-model') || DEFAULT_MODELS.mistral;
+  } else if (p === 'openrouter') {
+    const key = g('openrouter-key');
+    if (key && !key.startsWith('•')) payload.OPENROUTER_API_KEY = key;
+    payload.OPENROUTER_MODEL = g('openrouter-model') || DEFAULT_MODELS.openrouter;
+  }
+  return payload;
 }
 
 function selectProvider(id) {
@@ -367,43 +392,10 @@ async function saveWizardConfig() {
   const payload = {
     MOBSF_URL: state._mobsfUrl,
     PROVIDER: p,
+    ...buildConfigPayload('wiz', p),
   };
   if (state._mobsfKey && !state._mobsfKey.startsWith('•')) {
     payload.MOBSF_API_KEY = state._mobsfKey;
-  }
-
-  const g = id => $(id)?.value?.trim();
-
-  if (p === 'ollama') {
-    payload.OLLAMA_URL = g('wiz-ollama-url') || 'http://localhost:11434';
-    payload.OLLAMA_MODEL = g('wiz-ollama-model') || DEFAULT_MODELS.ollama;
-  } else if (p === 'lmstudio') {
-    payload.LM_STUDIO_URL = g('wiz-lmstudio-url') || 'http://localhost:1234';
-    payload.LM_STUDIO_MODEL = g('wiz-lmstudio-model') || '';
-  } else if (p === 'claude') {
-    const key = g('wiz-anthropic-key');
-    if (key && !key.startsWith('•')) payload.ANTHROPIC_API_KEY = key;
-    payload.CLAUDE_MODEL = g('wiz-claude-model') || DEFAULT_MODELS.claude;
-  } else if (p === 'openai') {
-    const key = g('wiz-openai-key');
-    if (key && !key.startsWith('•')) payload.OPENAI_API_KEY = key;
-    payload.OPENAI_MODEL = g('wiz-openai-model') || DEFAULT_MODELS.openai;
-  } else if (p === 'gemini') {
-    const key = g('wiz-gemini-key');
-    if (key && !key.startsWith('•')) payload.GEMINI_API_KEY = key;
-    payload.GEMINI_MODEL = g('wiz-gemini-model') || DEFAULT_MODELS.gemini;
-  } else if (p === 'groq') {
-    const key = g('wiz-groq-key');
-    if (key && !key.startsWith('•')) payload.GROQ_API_KEY = key;
-    payload.GROQ_MODEL = g('wiz-groq-model') || DEFAULT_MODELS.groq;
-  } else if (p === 'mistral') {
-    const key = g('wiz-mistral-key');
-    if (key && !key.startsWith('•')) payload.MISTRAL_API_KEY = key;
-    payload.MISTRAL_MODEL = g('wiz-mistral-model') || DEFAULT_MODELS.mistral;
-  } else if (p === 'openrouter') {
-    const key = g('wiz-openrouter-key');
-    if (key && !key.startsWith('•')) payload.OPENROUTER_API_KEY = key;
-    payload.OPENROUTER_MODEL = g('wiz-openrouter-model') || DEFAULT_MODELS.openrouter;
   }
 
   try {
@@ -1193,10 +1185,91 @@ function openReport(url) {
   setView('report');
 }
 
-// ─── Settings shortcut ────────────────────────────────────────────────────────
+// ─── Settings (returning users — single page, no step navigation) ────────────
 function openSettings() {
-  state.wizardStep = 1;
-  setView('wizard');
+  setView('settings');
+}
+
+function renderSettings() {
+  const cfg = state.config;
+  $('set-mobsf-url').value = cfg.mobsf_url || 'http://localhost:8000';
+  $('set-mobsf-key').value = cfg.mobsf_key_set ? '••••••••' : '';
+  $('set-mobsf-key-hint').textContent = cfg.mobsf_key_set
+    ? '✓ Key saved — leave blank to keep existing key.'
+    : 'Find it at http://localhost:8000 → top-right menu → REST API';
+
+  const grid = PROVIDERS.map(p => `
+    <div class="provider-card ${state.selectedProvider === p.id ? 'selected' : ''}" data-provider-id="${p.id}"
+         onclick="selectSettingsProvider('${p.id}')">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+        <div class="provider-name">${p.name}</div>
+        <span title="${p.location}" style="font-size:18px;line-height:1">${p.flag}</span>
+      </div>
+      <span class="provider-type badge-${p.type === 'offline' ? 'offline' : 'cloud'}">${p.type}</span>
+      <div class="provider-desc">${p.desc}</div>
+    </div>
+  `).join('');
+  $('settings-provider-grid').innerHTML = grid;
+
+  renderSettingsProviderFields();
+
+  Promise.all([
+    fetch('/api/version').then(r => r.json()),
+    fetch('/api/data-dir').then(r => r.json()),
+  ]).then(([{ version }, { data_dir }]) => {
+    const el = $('settings-version-line');
+    if (!el) return;
+    const updateNote = state.latestVersion
+      ? ` — <a href="#" onclick="showUpdateModal();return false" style="color:var(--accent)">v${state.latestVersion} available</a>`
+      : '';
+    el.innerHTML = `APK-JTM v${version}${updateNote}<br><span class="wizard-data-dir" title="Your config and reports are stored here">Data: ${data_dir}</span>`;
+  }).catch(() => {
+    const el = $('settings-version-line');
+    if (el) el.textContent = '';
+  });
+}
+
+// Re-renders only the "Configure <provider>" section — MobSF fields and any
+// in-progress edits there are left completely untouched.
+function renderSettingsProviderFields() {
+  const p = state.selectedProvider;
+  const pName = PROVIDERS.find(x => x.id === p)?.name || p;
+  $('settings-provider-fields-title').textContent = `Configure ${pName}`;
+  $('settings-provider-fields').innerHTML = buildProviderConfigFields('set', p, state.config);
+}
+
+function selectSettingsProvider(id) {
+  state.selectedProvider = id;
+  document.querySelectorAll('#settings-provider-grid .provider-card').forEach(el => {
+    el.classList.toggle('selected', el.dataset.providerId === id);
+  });
+  renderSettingsProviderFields();
+}
+
+async function saveSettingsConfig() {
+  const url = $('set-mobsf-url')?.value?.trim();
+  const key = $('set-mobsf-key')?.value?.trim();
+  if (!url) { toast('Enter a MobSF URL', 'err'); return; }
+
+  const p = state.selectedProvider;
+  const payload = {
+    MOBSF_URL: url,
+    PROVIDER: p,
+    ...buildConfigPayload('set', p),
+  };
+  if (key && !key.startsWith('•')) {
+    payload.MOBSF_API_KEY = key;
+  }
+
+  try {
+    await api('/api/config', { method: 'POST', body: payload });
+    state.config = await api('/api/config');
+    state.selectedProvider = state.config.provider || 'ollama';
+    toast('Settings saved', 'ok');
+    renderSettings(); // refresh masked keys etc — stay on the page
+  } catch (e) {
+    toast('Failed to save settings', 'err');
+  }
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

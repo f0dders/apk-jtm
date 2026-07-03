@@ -142,6 +142,13 @@ select option { background: var(--surface2); }
 
 .wizard-nav { display: flex; justify-content: space-between; margin-top: 28px; }
 
+/* Settings — single scrollable page, no step navigation (returning users) */
+.settings-page { max-width: 600px; margin: 0 auto; }
+.settings-section { margin-bottom: 16px; }
+.settings-section-title { font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 16px; text-transform: uppercase; letter-spacing: 0.05em; }
+.settings-section .provider-grid { margin-bottom: 0; }
+.settings-actions { display: flex; justify-content: flex-end; margin: 20px 0; }
+
 /* Drop zone */
 .dropzone {
   border: 2px dashed var(--border); border-radius: var(--radius);

@@ -4,6 +4,18 @@ All notable changes are documented here. Versions follow [Semantic Versioning](h
 
 ---
 
+## [v1.9.0] — 2026-07-03
+
+### New features
+
+- **Settings is now a proper single-page menu, separate from onboarding** — the ⚙ icon no longer reopens the 3-step first-run wizard. Instead it opens a Settings page with MobSF Connection, AI Provider, and Configure all visible at once, one "Save Settings" button, no Back/Continue step navigation. Switching AI provider only redraws the "Configure" section — MobSF fields (and any unsaved edits there) are left untouched. The onboarding wizard is unchanged and still runs on first launch.
+
+### Internal
+
+- Extracted `buildProviderConfigFields()` and `buildConfigPayload()` — the per-provider field HTML and payload-reading logic, previously duplicated inline in the wizard, are now shared between the wizard's step 3 and the new Settings page (parameterised by ID prefix so both can coexist in the DOM).
+
+---
+
 ## [v1.8.1] — 2026-07-03
 
 ### Fixes

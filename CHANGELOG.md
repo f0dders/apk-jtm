@@ -4,6 +4,14 @@ All notable changes are documented here. Versions follow [Semantic Versioning](h
 
 ---
 
+## [v1.9.1] — 2026-07-03
+
+### Documentation
+
+- **Added an Acknowledgements section to the README** — credits MobSF, APKiD, and Quark-Engine (the three engines this app orchestrates, all GPL-3.0/GPL-compatible) plus the supporting Python libraries, each with a verified licence and link. Licences were confirmed against installed package metadata rather than assumed.
+
+---
+
 ## [v1.9.0] — 2026-07-03
 
 ### New features

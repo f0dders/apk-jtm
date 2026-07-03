@@ -4,7 +4,7 @@
 
 # APK-JTM — Just tell me if it's dodgy!
 
-[![Version](https://img.shields.io/badge/version-v1.9.0-4ade80?style=flat-square)](https://github.com/f0dders/apk-jtm/releases)
+[![Version](https://img.shields.io/badge/version-v1.9.1-4ade80?style=flat-square)](https://github.com/f0dders/apk-jtm/releases)
 [![Licence](https://img.shields.io/badge/licence-GPL%20v3-blue?style=flat-square)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue?style=flat-square)](https://www.python.org/downloads/)
 
@@ -277,6 +277,32 @@ Close the terminal window that opened when you launched the app. MobSF continues
 ## Changelog
 
 See [CHANGELOG.md](CHANGELOG.md) for the full version history.
+
+---
+
+## Acknowledgements
+
+APK-JTM is an orchestration layer — the actual security analysis is done by these open-source projects. Full credit and thanks to their authors and communities.
+
+### Core analysis engines
+
+| Project | What it does here | Licence |
+|---|---|---|
+| [MobSF](https://github.com/MobSF/Mobile-Security-Framework-MobSF) | Static analysis engine — permissions, manifest, code, network, secrets, security score | GPL-3.0 |
+| [APKiD](https://github.com/rednaga/APKiD) | Packer, obfuscator, and anti-VM/anti-debug detection via YARA rules | GPL v3 (dual-licensed) |
+| [Quark-Engine](https://github.com/quark-engine/quark-engine) | Behavioural malware-family pattern matching | GPL-3.0 |
+
+All three are GPL-licensed, which lines up naturally with APK-JTM's own [GPL v3 licence](#licence).
+
+### Built with
+
+| Category | Projects |
+|---|---|
+| **Web server** | [FastAPI](https://github.com/fastapi/fastapi) (MIT), [Uvicorn](https://github.com/encode/uvicorn) (BSD-3-Clause), [sse-starlette](https://github.com/sysid/sse-starlette) (BSD-3-Clause) |
+| **AI provider SDKs** | [Anthropic](https://github.com/anthropics/anthropic-sdk-python) (MIT), [OpenAI](https://github.com/openai/openai-python) (Apache-2.0), [Google Generative AI](https://github.com/google-gemini/deprecated-generative-ai-python) (Apache-2.0), [Ollama](https://github.com/ollama/ollama-python) (MIT) — the same OpenAI-compatible client also drives Groq, Mistral, OpenRouter, and LM Studio |
+| **Utilities** | [Requests](https://github.com/psf/requests) (Apache-2.0), [Rich](https://github.com/Textualize/rich) (MIT), [python-dotenv](https://github.com/theskumar/python-dotenv) (BSD-3-Clause), [Python-Markdown](https://github.com/Python-Markdown/markdown) (BSD-3-Clause), [aiofiles](https://github.com/Tinche/aiofiles) (Apache-2.0), [python-multipart](https://github.com/Kludex/python-multipart) (Apache-2.0) |
+
+See [requirements.txt](requirements.txt) for the complete, version-pinned dependency list.
 
 ---
 

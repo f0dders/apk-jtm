@@ -4,6 +4,15 @@ All notable changes are documented here. Versions follow [Semantic Versioning](h
 
 ---
 
+## [v1.8.1] — 2026-07-03
+
+### Fixes
+
+- **Settings always showed Ollama selected, regardless of your actual configured provider** — `state.selectedProvider` was hardcoded at startup and never synced from the saved config, so opening ⚙ Settings highlighted Ollama even if you'd configured Claude (or anything else). Now syncs correctly on load and after saving.
+- **OpenAI/Gemini provider card descriptions still said "GPT-4o"/"Gemini 1.5 Pro"** — missed in the v1.8.0 model refresh since the card descriptions live in a separate array from the default model strings. Updated to "GPT-5 and above" / "Gemini 2.5 and above".
+
+---
+
 ## [v1.8.0] — 2026-07-03
 
 ### Fixes

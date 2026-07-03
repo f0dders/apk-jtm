@@ -27,6 +27,7 @@ async function init() {
     const cfg = await apiWithTimeout('/api/config', 8000);
     clearTimeout(fallbackTimer);
     state.config = cfg;
+    state.selectedProvider = cfg.provider || 'ollama';
     if (!cfg.configured) setView('wizard');
     else setView('scan');
   } catch (e) {
@@ -113,8 +114,8 @@ const PROVIDERS = [
   { id: 'ollama',      name: 'Ollama',      type: 'offline', flag: '🖥️', location: 'Your machine',     desc: 'Local models via Ollama. Fully offline.' },
   { id: 'lmstudio',   name: 'LM Studio',   type: 'offline', flag: '🖥️', location: 'Your machine',     desc: 'Local models via LM Studio. Fully offline.' },
   { id: 'claude',     name: 'Claude',      type: 'cloud',   flag: '🇺🇸', location: 'USA',              desc: 'Anthropic Claude. Best analysis quality.' },
-  { id: 'openai',     name: 'OpenAI',      type: 'cloud',   flag: '🇺🇸', location: 'USA',              desc: 'ChatGPT / GPT-4o.' },
-  { id: 'gemini',     name: 'Gemini',      type: 'cloud',   flag: '🇺🇸', location: 'USA',              desc: 'Google Gemini 1.5 Pro.' },
+  { id: 'openai',     name: 'OpenAI',      type: 'cloud',   flag: '🇺🇸', location: 'USA',              desc: 'ChatGPT / GPT-5 and above.' },
+  { id: 'gemini',     name: 'Gemini',      type: 'cloud',   flag: '🇺🇸', location: 'USA',              desc: 'Google Gemini 2.5 and above.' },
   { id: 'groq',       name: 'Groq',        type: 'cloud',   flag: '🇺🇸', location: 'USA',              desc: 'Ultra-fast inference. Generous free tier.' },
   { id: 'mistral',    name: 'Mistral',     type: 'cloud',   flag: '🇪🇺', location: 'EU (France)',       desc: 'European AI. Strong code & reasoning models.' },
   { id: 'openrouter', name: 'OpenRouter',  type: 'cloud',   flag: '🇺🇸', location: 'USA (multi-model)', desc: 'One key, 100+ models — Claude, GPT-4, Llama & more.' },
@@ -408,6 +409,7 @@ async function saveWizardConfig() {
   try {
     await api('/api/config', { method: 'POST', body: payload });
     state.config = await api('/api/config');
+    state.selectedProvider = state.config.provider || 'ollama';
     toast('Configuration saved', 'ok');
     setView('scan');
   } catch (e) {

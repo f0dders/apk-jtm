@@ -59,6 +59,26 @@ app = FastAPI(title="APK Security Analyser")
 UPLOADS_DIR = _APP_DIR / "uploads"
 UPLOADS_DIR.mkdir(exist_ok=True)
 
+
+def _sweep_stale_uploads(directory: Path = UPLOADS_DIR, max_age_seconds: int = 3600) -> int:
+    """Delete files in `directory` older than `max_age_seconds`.
+
+    Normal scans clean up their own upload in run_scan's finally block —
+    this only catches files orphaned by a hard process kill or crash
+    mid-scan. Returns the number of files removed.
+    """
+    import time
+    cutoff = time.time() - max_age_seconds
+    removed = 0
+    for f in directory.iterdir():
+        if f.is_file() and f.stat().st_mtime < cutoff:
+            f.unlink(missing_ok=True)
+            removed += 1
+    return removed
+
+
+_sweep_stale_uploads()
+
 # In-memory store: scan_id → asyncio.Queue of SSE events
 _scan_queues: dict[str, asyncio.Queue] = {}
 

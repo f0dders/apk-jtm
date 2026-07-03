@@ -4,6 +4,21 @@ All notable changes are documented here. Versions follow [Semantic Versioning](h
 
 ---
 
+## [v1.8.0] — 2026-07-03
+
+### Fixes
+
+- **Groq default model was heading toward breakage** — `llama-3.3-70b-versatile` (the app's hardcoded Groq default) was deprecated by Groq in June 2026. Default changed to `openai/gpt-oss-120b` (Groq's own recommended migration target — also faster and cheaper). If you configured Groq before this update, update your model in ⚙ Settings.
+
+### Improvements
+
+- **Refreshed cloud AI defaults** — Claude → `claude-sonnet-5`, OpenAI → `gpt-5.5`, Gemini → `gemini-2.5-pro`, OpenRouter → `anthropic/claude-sonnet-5`. Previous defaults (Sonnet 4.6, GPT-4o, Gemini 1.5 Pro) were one to two generations behind current.
+- **Model tier classifier updated** — added pattern matches for the new defaults plus `gpt-5.x` generally, `gpt-oss-120b`/`gpt-oss-20b`, and Qwen 3.5/3.6, so newer models correctly show as Frontier/Capable instead of falling through to "Unknown".
+- **README AI section overhauled** — cloud provider table notes now name actual current defaults; offline/Apple Silicon recommendations replaced with a RAM-tiered list (Qwen 3.5/3.6, gpt-oss 20B/120B) reflecting the current local-model landscape, while keeping the app's built-in Ollama default (`qwen2.5-coder:32b`) as the baseline recommendation.
+- Wizard field hints (Groq, OpenRouter, retry-with-model suggestions) updated to match.
+
+---
+
 ## [v1.7.0] — 2026-07-03
 
 ### New features

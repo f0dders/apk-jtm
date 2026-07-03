@@ -4,7 +4,7 @@
 
 # APK-JTM — Just tell me if it's dodgy!
 
-[![Version](https://img.shields.io/badge/version-v1.7.0-4ade80?style=flat-square)](https://github.com/f0dders/apk-jtm/releases)
+[![Version](https://img.shields.io/badge/version-v1.8.0-4ade80?style=flat-square)](https://github.com/f0dders/apk-jtm/releases)
 [![Licence](https://img.shields.io/badge/licence-GPL%20v3-blue?style=flat-square)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue?style=flat-square)](https://www.python.org/downloads/)
 
@@ -151,26 +151,31 @@ Settings are saved to your user data directory. Change them later via the ⚙ ic
 
 | Provider | Setup | Recommended model |
 |---|---|---|
-| **Ollama** | Install from [ollama.com](https://ollama.com), run `ollama pull gemma3:27b` | `gemma3:27b` (~17 GB) |
+| **Ollama** | Install from [ollama.com](https://ollama.com), run `ollama pull qwen2.5-coder:32b` | `qwen2.5-coder:32b` (~20 GB) — the app's built-in default |
 | **LM Studio** | Install from [lmstudio.ai](https://lmstudio.ai), load a model, start the server | Any GGUF model |
 
-**Apple Silicon recommendations:**
-- `gemma3:27b` — strong all-round analysis, 17 GB RAM
-- `qwen2.5-coder:32b` — excellent code analysis, 20 GB RAM
-- `llama3.3:70b` — best reasoning, 40 GB RAM
+**Apple Silicon recommendations (by RAM tier):** the built-in default above is a solid, code-analysis-tuned choice, but these are worth trying too:
+- **16 GB** — `qwen3.5:9b`, ~6.6 GB, punches well above its size on reasoning
+- **24–32 GB** — `qwen3.6:27b`, flagship-class output at ~17 GB
+- **32 GB+** — `gpt-oss:20b` (Apache 2.0, strong reasoning, ~16 GB) or `qwen3.6:35b`
+- **80 GB+** — `gpt-oss:120b`, closer to frontier cloud quality, fully offline
+
+> Local model rankings move fast — these are current as of mid-2026. Whatever you pick, check `ollama pull <model>` works before relying on it for a scan.
 
 ### Cloud (best quality)
 
 | Provider | Where to get a key | Notes |
 |---|---|---|
-| **Claude** (recommended) | [console.anthropic.com](https://console.anthropic.com) | Best analysis quality |
-| **OpenAI** | [platform.openai.com/api-keys](https://platform.openai.com/api-keys) | GPT-4o and above |
-| **Gemini** | [aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey) | Free tier available |
-| **Groq** | [console.groq.com](https://console.groq.com) | Very fast, free tier |
+| **Claude** (recommended) | [console.anthropic.com](https://console.anthropic.com) | Best analysis quality — defaults to Sonnet 5 |
+| **OpenAI** | [platform.openai.com/api-keys](https://platform.openai.com/api-keys) | GPT-5.5 and above |
+| **Gemini** | [aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey) | Free tier available — defaults to Gemini 2.5 Pro |
+| **Groq** | [console.groq.com](https://console.groq.com) | Very fast, free tier — defaults to `openai/gpt-oss-120b` |
 | **Mistral** | [console.mistral.ai](https://console.mistral.ai) | Strong EU-based option |
 | **OpenRouter** | [openrouter.ai/keys](https://openrouter.ai/keys) | One key, 100+ models |
 
-> **OpenRouter model names** use the `provider/model` format — e.g. `anthropic/claude-sonnet-4-6`, `meta-llama/llama-3.3-70b-instruct:free`. Browse models at [openrouter.ai/models](https://openrouter.ai/models).
+> **OpenRouter model names** use the `provider/model` format — e.g. `anthropic/claude-sonnet-5`, `meta-llama/llama-3.3-70b-instruct:free`. Browse models at [openrouter.ai/models](https://openrouter.ai/models).
+
+> **Groq note:** Groq deprecated `llama-3.3-70b-versatile` in June 2026. If you configured Groq before this update and analysis suddenly stops working, switch your model to `openai/gpt-oss-120b` in ⚙ Settings.
 
 ---
 

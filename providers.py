@@ -57,7 +57,7 @@ class LMStudioProvider:
 
 class ClaudeProvider:
     name = "claude"
-    DEFAULT_MODEL = "claude-sonnet-4-6"
+    DEFAULT_MODEL = "claude-sonnet-5"
 
     def __init__(self, model: str, api_key: str):
         self.model = model or self.DEFAULT_MODEL
@@ -77,7 +77,7 @@ class ClaudeProvider:
 
 class OpenAIProvider:
     name = "openai"
-    DEFAULT_MODEL = "gpt-4o"
+    DEFAULT_MODEL = "gpt-5.5"
 
     def __init__(self, model: str, api_key: str):
         self.model = model or self.DEFAULT_MODEL
@@ -100,7 +100,7 @@ class OpenAIProvider:
 
 class GeminiProvider:
     name = "gemini"
-    DEFAULT_MODEL = "gemini-1.5-pro"
+    DEFAULT_MODEL = "gemini-2.5-pro"
 
     def __init__(self, model: str, api_key: str):
         self.model = model or self.DEFAULT_MODEL
@@ -123,7 +123,9 @@ class GeminiProvider:
 class GroqProvider:
     """Groq — ultra-fast inference via LPU hardware. OpenAI-compatible API."""
     name = "groq"
-    DEFAULT_MODEL = "llama-3.3-70b-versatile"
+    # Groq announced deprecation of llama-3.3-70b-versatile (June 2026) and
+    # recommends gpt-oss-120b as the migration target — faster and cheaper too.
+    DEFAULT_MODEL = "openai/gpt-oss-120b"
 
     def __init__(self, model: str, api_key: str):
         self.model = model or self.DEFAULT_MODEL
@@ -171,7 +173,7 @@ class MistralProvider:
 class OpenRouterProvider:
     """OpenRouter — one API key, 100+ models from every major provider."""
     name = "openrouter"
-    DEFAULT_MODEL = "anthropic/claude-sonnet-4-6"
+    DEFAULT_MODEL = "anthropic/claude-sonnet-5"
 
     def __init__(self, model: str, api_key: str):
         self.model = model or self.DEFAULT_MODEL

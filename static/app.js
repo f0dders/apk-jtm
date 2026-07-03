@@ -123,12 +123,12 @@ const PROVIDERS = [
 const DEFAULT_MODELS = {
   ollama:      'qwen2.5-coder:32b',
   lmstudio:    '',
-  claude:      'claude-sonnet-4-6',
-  openai:      'gpt-4o',
-  gemini:      'gemini-1.5-pro',
-  groq:        'llama-3.3-70b-versatile',
+  claude:      'claude-sonnet-5',
+  openai:      'gpt-5.5',
+  gemini:      'gemini-2.5-pro',
+  groq:        'openai/gpt-oss-120b',
   mistral:     'mistral-large-latest',
-  openrouter:  'anthropic/claude-sonnet-4-6',
+  openrouter:  'anthropic/claude-sonnet-5',
 };
 
 function renderWizard() {
@@ -284,7 +284,7 @@ function renderWizardStep() {
         <div class="field">
           <label>Model</label>
           <input id="wiz-groq-model" type="text" value="${cfg.groq_model || DEFAULT_MODELS.groq}">
-          <div class="field-hint">Fast options: llama-3.3-70b-versatile · mixtral-8x7b-32768 · gemma2-9b-it</div>
+          <div class="field-hint">Fast options: openai/gpt-oss-120b (flagship) · openai/gpt-oss-20b (fastest/cheapest) · llama-3.3-70b-versatile (deprecated — migrate away)</div>
         </div>
       `;
     } else if (p === 'mistral') {
@@ -310,7 +310,7 @@ function renderWizardStep() {
         <div class="field">
           <label>Model</label>
           <input id="wiz-openrouter-model" type="text" value="${cfg.openrouter_model || DEFAULT_MODELS.openrouter}">
-          <div class="field-hint">Use the full <code>provider/model</code> slug from openrouter.ai/models, e.g. <code>anthropic/claude-sonnet-4-6</code> · <code>openai/gpt-4o</code> · <code>meta-llama/llama-3.3-70b-instruct:free</code></div>
+          <div class="field-hint">Use the full <code>provider/model</code> slug from openrouter.ai/models, e.g. <code>anthropic/claude-sonnet-5</code> · <code>openai/gpt-5.5</code> · <code>meta-llama/llama-3.3-70b-instruct:free</code></div>
         </div>
         <div class="info-box">
           ⏱ <strong>Free-tier models can be slow.</strong> Large models (200B+) may take 2–5 minutes to respond, or time out under heavy load. For reliable speed, try <code>meta-llama/llama-3.3-70b-instruct:free</code> or a paid model.
@@ -721,7 +721,7 @@ function buildModelSuggestions(provider) {
     ? SUGGESTED_MODELS
     : [
         { slug: 'meta-llama/llama-3.3-70b-instruct:free', label: 'Switch to OpenRouter (free)', note: 'openrouter.ai' },
-        { slug: 'llama-3.3-70b-versatile', label: 'Switch to Groq (free)', note: 'Very fast · console.groq.com' },
+        { slug: 'openai/gpt-oss-120b', label: 'Switch to Groq (free)', note: 'Very fast · console.groq.com' },
       ];
 
   suggestions.forEach(({ slug, label, note }) => {

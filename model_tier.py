@@ -11,11 +11,13 @@ _FRONTIER = [
     # Anthropic
     "claude-opus", "claude-3-opus",
     "claude-sonnet-4", "claude-3-5-sonnet", "claude-3-7-sonnet", "claude-sonnet-4-6",
+    "claude-sonnet-5", "claude-opus-4",
     # OpenAI
     "gpt-4o", "gpt-4-turbo", "gpt-4-1106", "gpt-4-0125",
+    "gpt-5", "gpt-oss-120b",
     "o1-preview", "o1-mini", "o1-", "o3-",
     # Google
-    "gemini-1.5-pro", "gemini-2.", "gemini-ultra", "gemini-exp",
+    "gemini-1.5-pro", "gemini-2.", "gemini-3.", "gemini-ultra", "gemini-exp",
     # Meta
     "llama-3.1-405b", "llama-3.3-70b",
     # DeepSeek
@@ -23,13 +25,15 @@ _FRONTIER = [
     # Mistral
     "mistral-large",
     "mixtral-8x22b",
+    # Alibaba
+    "qwen3.6-27b", "qwen3.6-35b",
 ]
 
 _CAPABLE = [
     # Anthropic
     "claude-haiku",
     # OpenAI
-    "gpt-4o-mini", "gpt-3.5-turbo",
+    "gpt-4o-mini", "gpt-3.5-turbo", "gpt-oss-20b",
     # Google
     "gemini-1.5-flash", "gemini-flash",
     # Meta
@@ -39,7 +43,7 @@ _CAPABLE = [
     # Cohere
     "command-r-plus", "command-r",
     # Alibaba
-    "qwen2.5-72b", "qwen-72b",
+    "qwen2.5-72b", "qwen-72b", "qwen3.5-9b",
     # DeepSeek
     "deepseek-chat",
 ]

@@ -11,6 +11,16 @@ def test_frontier_model_detected():
     assert model_tier.classify("gpt-4o") == "frontier"
 
 
+def test_current_default_models_classify_as_frontier():
+    """Regression guard: the app's own hardcoded provider defaults
+    (providers.py DEFAULT_MODEL) must never silently show as 'Unknown'."""
+    assert model_tier.classify("claude-sonnet-5") == "frontier"
+    assert model_tier.classify("gpt-5.5") == "frontier"
+    assert model_tier.classify("gemini-2.5-pro") == "frontier"
+    assert model_tier.classify("openai/gpt-oss-120b") == "frontier"
+    assert model_tier.classify("anthropic/claude-sonnet-5") == "frontier"
+
+
 def test_capable_model_detected():
     assert model_tier.classify("claude-haiku-4-5") == "capable"
 

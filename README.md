@@ -4,7 +4,7 @@
 
 # APK-JTM — Just tell me if it's dodgy!
 
-[![Version](https://img.shields.io/badge/version-v1.9.3-4ade80?style=flat-square)](https://github.com/f0dders/apk-jtm/releases)
+[![Version](https://img.shields.io/badge/version-v1.9.4-4ade80?style=flat-square)](https://github.com/f0dders/apk-jtm/releases)
 [![Licence](https://img.shields.io/badge/licence-GPL%20v3-blue?style=flat-square)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue?style=flat-square)](https://www.python.org/downloads/)
 
@@ -277,6 +277,12 @@ Close the terminal window that opened when you launched the app. MobSF continues
 ## Changelog
 
 See [CHANGELOG.md](CHANGELOG.md) for the full version history.
+
+---
+
+## Contributing
+
+Bug reports and feature requests are welcome via the issue templates. Found a security vulnerability? See [SECURITY.md](SECURITY.md) instead of opening a public issue. For code contributions, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ---
 

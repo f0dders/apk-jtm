@@ -4,6 +4,14 @@ All notable changes are documented here. Versions follow [Semantic Versioning](h
 
 ---
 
+## [v1.9.4] — 2026-07-03
+
+### Documentation
+
+- **Added CONTRIBUTING.md** — documents the actual maintenance model (solo direct-to-`main` commits by the maintainer) and the process for external contributors (fork, branch, PR, tests must pass, update CHANGELOG under `[Unreleased]`). Prompted by a git-practices review that found issue templates existed but nothing told an outside contributor how to actually submit a code change.
+
+---
+
 ## [v1.9.3] — 2026-07-03
 
 ### Fixes

@@ -569,6 +569,12 @@ async def run_scan(
 
     except Exception as e:
         send("error", {"message": f"Unexpected error: {e}"})
+    finally:
+        # Uploaded APK/JSON are only needed for the duration of this scan —
+        # MobSF and APKiD have already read them by every exit point above.
+        for _path in (apk_path, report_path):
+            if _path:
+                Path(_path).unlink(missing_ok=True)
 
 
 _PERM_PLAIN = {

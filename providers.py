@@ -107,13 +107,13 @@ class GeminiProvider:
         self.api_key = api_key
 
     def stream(self, prompt: str) -> Iterator[str]:
-        import google.generativeai as genai
-        genai.configure(api_key=self.api_key)
-        model = genai.GenerativeModel(self.model)
-        response = model.generate_content(
-            prompt,
-            stream=True,
-            generation_config={"temperature": 0.2},
+        from google import genai
+        from google.genai import types
+        client = genai.Client(api_key=self.api_key)
+        response = client.models.generate_content_stream(
+            model=self.model,
+            contents=prompt,
+            config=types.GenerateContentConfig(temperature=0.2),
         )
         for chunk in response:
             if chunk.text:

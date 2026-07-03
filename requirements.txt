@@ -17,7 +17,7 @@ ollama>=0.1.7
 # Cloud providers
 openai>=1.30.0        # also covers Groq, Mistral, OpenRouter, LM Studio (all OpenAI-compatible)
 anthropic>=0.28.0
-google-generativeai>=0.7.0
+google-genai>=1.0.0
 
 # Supplemental analysis tools
 # apkid is installed separately by the launcher (optional — requires native build tools;

@@ -4,6 +4,16 @@ All notable changes are documented here. Versions follow [Semantic Versioning](h
 
 ---
 
+## [v1.9.3] — 2026-07-03
+
+### Fixes
+
+- **Migrated Gemini provider from `google-generativeai` to `google-genai`** — Google deprecated the old SDK; `GeminiProvider.stream()` now uses `genai.Client(...).models.generate_content_stream(...)`, same streaming interface, no behaviour change for users.
+- **README Acknowledgements entry updated to match** — was pointing at the deprecated package's repo; now links `googleapis/python-genai`, the SDK actually installed.
+- **"Compare versions" description now mentions Quark-Engine** — the feature has diffed Quark threat-level changes since v1.7.0, but the README's description of what gets compared never mentioned it.
+
+---
+
 ## [v1.9.2] — 2026-07-03
 
 ### Documentation

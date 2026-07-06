@@ -4,6 +4,15 @@ All notable changes are documented here. Versions follow [Semantic Versioning](h
 
 ---
 
+## [v1.11.0] — 2026-07-06
+
+### New features
+
+- **Reports can now be written in any language** — a new "Report Language" field in ⚙ Settings (default British English) controls the language the AI writes its report in, alongside a matching `--language` CLI flag and `REPORT_LANGUAGE` config key. Since the AI generates the report body itself, this covers non-English languages essentially for free, not just US/UK English.
+- **Offline install bundle for air-gapped machines** — `scripts/build_offline_bundle.sh` produces a pre-built archive (vendored dependency wheels, a saved MobSF Docker image, and a Quark-Engine rules snapshot) plus a matching offline launcher (`Start - Mac (Offline).command`, `Start - Linux (Offline).sh`), so the app can be installed with zero network access — only Python 3.12 and Docker need to already be present on the target machine. See [docs/OFFLINE.md](docs/OFFLINE.md). Windows offline bundles aren't built yet; `main.py --report <mobsf.json>` remains a fully offline workaround there.
+
+---
+
 ## [v1.10.1] — 2026-07-06
 
 ### Fixes

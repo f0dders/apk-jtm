@@ -53,6 +53,7 @@ Examples:
     parser.add_argument("--mobsf-key", default=os.getenv("MOBSF_API_KEY", ""))
     parser.add_argument("--ollama-url", default=os.getenv("OLLAMA_URL", "http://localhost:11434"))
     parser.add_argument("--lmstudio-url", default=os.getenv("LM_STUDIO_URL", "http://localhost:1234"))
+    parser.add_argument("--language", default=os.getenv("REPORT_LANGUAGE", "British English"), help="Language for the AI-generated report (default: British English)")
     parser.add_argument("--output-dir", default=".", help="Directory to save the report")
     parser.add_argument("--save-raw", action="store_true", help="Also save the raw MobSF JSON")
     args = parser.parse_args()
@@ -126,7 +127,7 @@ Examples:
     console.print(f"\n[cyan]Analysing...[/cyan]")
     console.print(Rule())
 
-    prompt = prompts.build_analysis_prompt(extracted)
+    prompt = prompts.build_analysis_prompt(extracted, language=args.language)
     ai_output = []
 
     try:

@@ -1,7 +1,7 @@
 import json
 
 
-def build_analysis_prompt(extracted: dict) -> str:
+def build_analysis_prompt(extracted: dict, language: str = "British English") -> str:
     app   = extracted["app"]
     score = extracted["security_score"]
     cvss  = extracted["average_cvss"]
@@ -9,7 +9,9 @@ def build_analysis_prompt(extracted: dict) -> str:
     sections = []
 
     # ── System role + context block ──────────────────────────────────────────
-    sections.append(f"""You are an expert mobile application security analyst. Your job is to produce a clear, plain-English security report for a non-technical reader — someone who needs to decide whether this app is safe to use or allow on their network.
+    sections.append(f"""You are an expert mobile application security analyst. Your job is to produce a clear, plain-{language} security report for a non-technical reader — someone who needs to decide whether this app is safe to use or allow on their network.
+
+**Write the entire report in {language}.** This applies to spelling, phrasing, and idiom throughout — including section headings you generate content for, findings, and the summary.
 
 **Critically:** you must use your existing knowledge about this app when writing the report. Do not treat findings in isolation — a permission or behaviour that looks alarming in an unknown app may be completely normal and expected for a well-known, trusted application. Your job is to give an accurate picture, not to generate false alarm.
 
@@ -131,7 +133,7 @@ def build_analysis_prompt(extracted: dict) -> str:
     # ── Instructions ─────────────────────────────────────────────────────────
     prompt_body = "\n\n".join(sections)
 
-    prompt_body += """
+    prompt_body += f"""
 
 ---
 
@@ -232,7 +234,7 @@ Unambiguous list of anything that suggests malicious behaviour, spyware, or dang
 - Do not use "In conclusion", "Overall", or "To summarise"
 - If a section has nothing meaningful to add, write one sentence saying so
 - Be direct: if something is genuinely dangerous, say it is; if it is not, say that too
-- Use plain English throughout — briefly explain any technical terms
+- Write the entire report in {language}, plain and jargon-light — briefly explain any technical terms
 
 **Reminder — your response MUST end with exactly these two lines, nothing after them:**
 VERDICT: <LOW|MEDIUM|HIGH|CRITICAL>

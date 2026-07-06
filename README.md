@@ -4,7 +4,7 @@
 
 # APK-JTM — Just tell me if it's dodgy!
 
-[![Version](https://img.shields.io/badge/version-v1.10.1-4ade80?style=flat-square)](https://github.com/f0dders/apk-jtm/releases)
+[![Version](https://img.shields.io/badge/version-v1.11.0-4ade80?style=flat-square)](https://github.com/f0dders/apk-jtm/releases)
 [![Licence](https://img.shields.io/badge/licence-GPL%20v3-blue?style=flat-square)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue?style=flat-square)](https://www.python.org/downloads/)
 
@@ -141,7 +141,13 @@ On first visit, a 3-step wizard guides you through:
 2. **AI provider** — choose offline (Ollama or LM Studio) or cloud
 3. **Configure** — enter your model name or API key
 
-Settings are saved to your user data directory. **After onboarding**, the ⚙ icon opens a single Settings page instead — MobSF connection, AI provider, and configuration are all visible at once with one Save button, no step-by-step navigation needed for a quick change.
+Settings are saved to your user data directory. **After onboarding**, the ⚙ icon opens a single Settings page instead — MobSF connection, AI provider, and configuration are all visible at once with one Save button, no step-by-step navigation needed for a quick change. The same page also has a **Report Language** field (default British English) controlling the language the AI writes reports in — type any language, not just the suggested shortcuts.
+
+---
+
+## Offline installation
+
+The Quick Start above needs internet for Python/Docker setup and to pull MobSF's image. For an air-gapped machine — e.g. a sandbox VM for testing a dodgy APK with no internet at all — see [docs/OFFLINE.md](docs/OFFLINE.md) for a pre-built bundle instead: vendored dependency wheels, a saved MobSF Docker image, and Quark-Engine's rule database, installing with zero network access. Mac and Linux are supported; Windows isn't yet (see that doc for the workaround).
 
 ---
 

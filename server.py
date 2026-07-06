@@ -185,6 +185,7 @@ async def get_config():
         "mistral_model": env.get("MISTRAL_MODEL", "mistral-large-latest"),
         "openrouter_key_set": bool(env.get("OPENROUTER_API_KEY")),
         "openrouter_model": env.get("OPENROUTER_MODEL", "anthropic/claude-sonnet-4-6"),
+        "report_language": env.get("REPORT_LANGUAGE", "British English"),
     }
 
 
@@ -644,7 +645,7 @@ async def run_scan(
         send("progress", {"stage": "analysis", "message": f"Sending to {provider.name}..."})
 
         from prompts import build_analysis_prompt
-        prompt = build_analysis_prompt(extracted)
+        prompt = build_analysis_prompt(extracted, language=env.get("REPORT_LANGUAGE", "British English"))
 
         ai_chunks = []
         chunk_queue: asyncio.Queue = asyncio.Queue()

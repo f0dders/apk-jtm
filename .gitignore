@@ -37,3 +37,6 @@ report_*.md
 
 # Root-level logo duplicate (canonical copy is static/logo.png)
 /logo.png
+
+# Offline bundle build output (scripts/build_offline_bundle.sh)
+dist/

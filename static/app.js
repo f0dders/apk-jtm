@@ -1220,6 +1220,7 @@ function renderSettings() {
   $('set-mobsf-key-hint').textContent = cfg.mobsf_key_set
     ? '✓ Key saved — leave blank to keep existing key.'
     : 'Find it at http://localhost:8000 → top-right menu → REST API';
+  $('set-report-language').value = cfg.report_language || 'British English';
 
   const grid = PROVIDERS.map(p => `
     <div class="provider-card ${state.selectedProvider === p.id ? 'selected' : ''}" data-provider-id="${p.id}"
@@ -1272,12 +1273,14 @@ function selectSettingsProvider(id) {
 async function saveSettingsConfig() {
   const url = $('set-mobsf-url')?.value?.trim();
   const key = $('set-mobsf-key')?.value?.trim();
+  const language = $('set-report-language')?.value?.trim();
   if (!url) { toast('Enter a MobSF URL', 'err'); return; }
 
   const p = state.selectedProvider;
   const payload = {
     MOBSF_URL: url,
     PROVIDER: p,
+    REPORT_LANGUAGE: language || 'British English',
     ...buildConfigPayload('set', p),
   };
   if (key && !key.startsWith('•')) {

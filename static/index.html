@@ -101,6 +101,22 @@
           <div id="settings-provider-fields"></div>
         </div>
 
+        <div class="card settings-section">
+          <div class="settings-section-title">Report</div>
+          <div class="field">
+            <label>Report Language</label>
+            <input id="set-report-language" type="text" list="report-language-options" placeholder="British English">
+            <datalist id="report-language-options">
+              <option value="British English">
+              <option value="American English">
+              <option value="French">
+              <option value="German">
+              <option value="Spanish">
+            </datalist>
+            <div class="field-hint">Language the AI writes the report in. Type any language — this list is just a shortcut.</div>
+          </div>
+        </div>
+
         <div class="settings-actions">
           <button class="btn-primary" onclick="saveSettingsConfig()">Save Settings</button>
         </div>

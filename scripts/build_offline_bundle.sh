@@ -165,14 +165,19 @@ fi
 echo ""
 
 # ── Offline launcher + install notes ─────────────────────────────────────────
+# These templates live under scripts/launchers/offline/, not repo root — the
+# offline launcher only ever runs from inside an extracted bundle (against
+# its wheels/, mobsf-image.tar, quark-rules-snapshot/), never in place in a
+# git checkout, so it has no reason to sit at the repo's top level.
 LAUNCHER_NAME="Start - Mac (Offline).command"
 [ "$PLATFORM" = "linux" ] && LAUNCHER_NAME="Start - Linux (Offline).sh"
+LAUNCHER_SRC="scripts/launchers/offline/${LAUNCHER_NAME}"
 
-if [ -f "$LAUNCHER_NAME" ]; then
-  cp "$LAUNCHER_NAME" "${STAGING_DIR}/${LAUNCHER_NAME}"
+if [ -f "$LAUNCHER_SRC" ]; then
+  cp "$LAUNCHER_SRC" "${STAGING_DIR}/${LAUNCHER_NAME}"
   chmod +x "${STAGING_DIR}/${LAUNCHER_NAME}"
 else
-  echo -e "${RED}  [ERROR] Offline launcher '${LAUNCHER_NAME}' not found at repo root.${RESET}"
+  echo -e "${RED}  [ERROR] Offline launcher '${LAUNCHER_SRC}' not found.${RESET}"
   exit 1
 fi
 

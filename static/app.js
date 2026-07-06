@@ -499,6 +499,19 @@ function resetProgressView() {
   hide('progress-meta');
   hide('btn-view-report');
   show('btn-cancel-scan');
+
+  // Undo the completion-state mutations finishScan() applies, so a stale
+  // "Analysis complete" from a previous scan can't bleed into a fresh one.
+  const heading = document.querySelector('#view-progress h2');
+  const subtitle = document.querySelector('#view-progress .text-muted');
+  if (heading) heading.textContent = 'Analysing';
+  if (subtitle) subtitle.textContent = 'Sit tight — MobSF is scanning and the AI is working through the findings';
+
+  const termLabel = document.querySelector('#progress-terminal-wrap .text-muted');
+  if (termLabel) termLabel.textContent = 'Streaming output';
+
+  const btn = $('btn-view-report');
+  btn.className = btn.className.replace('btn-primary', 'btn-secondary');
 }
 
 function streamProgress(scanId) {

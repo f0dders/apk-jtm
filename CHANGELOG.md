@@ -4,6 +4,14 @@ All notable changes are documented here. Versions follow [Semantic Versioning](h
 
 ---
 
+## [v1.10.1] — 2026-07-06
+
+### Fixes
+
+- **The progress view could show "Analysis complete" for a scan that had barely started** — starting a new scan reused the progress screen from the last one without resetting the heading, subtitle, AI-output label, and "View Report" button styling that only get set once a scan actually finishes. If those were still showing a previous scan's completed state, a fresh scan would look "done" while its stages were genuinely still running underneath. The progress view now resets fully to its in-progress state at the start of every scan.
+
+---
+
 ## [v1.10.0] — 2026-07-06
 
 ### Fixes

@@ -42,3 +42,12 @@ def test_frontier_checked_before_basic():
     that suffix (as OpenRouter sometimes formats free-tier frontier access)
     must still resolve to frontier since _FRONTIER is checked first."""
     assert model_tier.classify("anthropic/claude-sonnet-4-6:free") == "frontier"
+
+
+def test_frontier_prefix_does_not_swallow_cheap_siblings():
+    """Some _FRONTIER entries are version-prefixes ("gpt-5", "gemini-2.")
+    rather than full model names, so they'd otherwise also match that
+    generation's cheap/fast siblings. Those must not be badged Frontier."""
+    assert model_tier.classify("gpt-5-nano") != "frontier"
+    assert model_tier.classify("gemini-2.0-flash-lite") != "frontier"
+    assert model_tier.classify("gemini-3.0-flash") != "frontier"

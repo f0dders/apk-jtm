@@ -41,7 +41,7 @@ def run_apkid(apk_path: str, timeout: int = 60) -> dict:
         return {"available": False, "reason": "APKiD not installed — run: pip install apkid"}
     except subprocess.TimeoutExpired:
         return {"available": False, "reason": "APKiD timed out"}
-    except (json.JSONDecodeError, Exception) as e:
+    except Exception as e:
         return {"available": False, "reason": str(e)}
     return {"available": False, "reason": "No output from APKiD"}
 

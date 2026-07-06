@@ -66,6 +66,13 @@ _BASIC = [
     "-1b", "-3b", "-7b", "-8b",
 ]
 
+# A few _FRONTIER entries are version-prefixes ("gpt-5", "gemini-2.") rather
+# than full model names, so they'd also match that generation's cheap/fast
+# siblings (e.g. "gpt-5-nano", "gemini-2.0-flash-lite"). Skip the frontier
+# match when one of these qualifiers appears after it — such a slug falls
+# through to capable/basic/unknown instead of being wrongly badged Frontier.
+_FRONTIER_CHEAP_QUALIFIERS = ("-flash", "-nano", "-mini", "-lite")
+
 # (display_label, hex_colour, description_for_disclaimer)
 TIER_META: dict[str, tuple[str, str, str]] = {
     "frontier": ("Frontier", "#10b981", ""),
@@ -83,8 +90,13 @@ def classify(model: str) -> str:
     """Return 'frontier', 'capable', 'basic', or 'unknown'."""
     m = model.lower()
     for pattern in _FRONTIER:
-        if pattern in m:
-            return "frontier"
+        idx = m.find(pattern)
+        if idx == -1:
+            continue
+        rest = m[idx + len(pattern):]
+        if any(q in rest for q in _FRONTIER_CHEAP_QUALIFIERS):
+            continue
+        return "frontier"
     for pattern in _CAPABLE:
         if pattern in m:
             return "capable"

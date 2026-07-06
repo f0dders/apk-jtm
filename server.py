@@ -17,6 +17,7 @@ import asyncio
 import json
 import os
 import shutil
+import time
 import uuid
 from pathlib import Path
 from typing import AsyncIterator
@@ -59,6 +60,33 @@ app = FastAPI(title="APK Security Analyser")
 UPLOADS_DIR = _APP_DIR / "uploads"
 UPLOADS_DIR.mkdir(exist_ok=True)
 
+MAX_UPLOAD_SIZE = 500 * 1024 * 1024  # 500MB — generous headroom for an APK/JSON report
+
+# Cold model loads can take minutes to produce a first token, but a stall
+# after streaming has started usually means something's hung — so the
+# first chunk gets a generous allowance and later chunks get a much
+# shorter one. providers.py's OpenRouter httpx read timeout mirrors
+# FIRST_CHUNK_TIMEOUT so it doesn't trip before this one applies.
+FIRST_CHUNK_TIMEOUT = 300
+INTER_CHUNK_TIMEOUT = 90
+
+
+async def _stream_upload_to_file(upload: UploadFile, dest: Path, max_size: int = MAX_UPLOAD_SIZE) -> None:
+    """Write an uploaded file to disk in chunks instead of buffering it
+    fully in memory, and reject anything past max_size."""
+    written = 0
+    with open(dest, "wb") as f:
+        while chunk := await upload.read(1024 * 1024):
+            written += len(chunk)
+            if written > max_size:
+                f.close()
+                dest.unlink(missing_ok=True)
+                raise HTTPException(
+                    status_code=413,
+                    detail=f"Upload exceeds {max_size // (1024 * 1024)}MB limit",
+                )
+            f.write(chunk)
+
 
 def _sweep_stale_uploads(directory: Path = UPLOADS_DIR, max_age_seconds: int = 3600) -> int:
     """Delete files in `directory` older than `max_age_seconds`.
@@ -67,7 +95,6 @@ def _sweep_stale_uploads(directory: Path = UPLOADS_DIR, max_age_seconds: int = 3
     this only catches files orphaned by a hard process kill or crash
     mid-scan. Returns the number of files removed.
     """
-    import time
     cutoff = time.time() - max_age_seconds
     removed = 0
     for f in directory.iterdir():
@@ -79,8 +106,24 @@ def _sweep_stale_uploads(directory: Path = UPLOADS_DIR, max_age_seconds: int = 3
 
 _sweep_stale_uploads()
 
-# In-memory store: scan_id → asyncio.Queue of SSE events
-_scan_queues: dict[str, asyncio.Queue] = {}
+# In-memory store: scan_id → (asyncio.Queue of SSE events, created-at timestamp)
+_scan_queues: dict[str, tuple[asyncio.Queue, float]] = {}
+
+
+def _sweep_stale_scan_queues(max_age_seconds: int = 3600) -> int:
+    """Remove scan queues whose SSE stream was never opened by a client.
+
+    event_generator() only pops a queue once a complete/error event is
+    consumed from it — if the browser tab closes before ever connecting to
+    /api/scan/{scan_id}/stream, the queue is never touched again. Unlike
+    uploaded files (_sweep_stale_uploads), there was no equivalent sweep for
+    these, so they'd accumulate for the life of a long-running server.
+    """
+    cutoff = time.time() - max_age_seconds
+    stale = [scan_id for scan_id, (_, created_at) in _scan_queues.items() if created_at < cutoff]
+    for scan_id in stale:
+        _scan_queues.pop(scan_id, None)
+    return len(stale)
 
 PROVIDERS = ["ollama", "lmstudio", "claude", "openai", "gemini", "groq", "mistral", "openrouter"]
 
@@ -105,6 +148,8 @@ async def index():
 
 @app.get("/reports/{filename}")
 async def serve_report(filename: str):
+    if ".." in filename or "/" in filename:
+        raise HTTPException(status_code=400, detail="Invalid filename")
     path = REPORTS_DIR / filename
     if not path.exists():
         raise HTTPException(status_code=404, detail="Report not found")
@@ -342,9 +387,10 @@ async def rerun_report(filename: str, payload: dict, background_tasks: Backgroun
     if not md5:
         raise HTTPException(status_code=400, detail="No MobSF hash stored for this report — cannot re-run without the original APK")
 
+    _sweep_stale_scan_queues()
     scan_id = str(uuid.uuid4())
     queue: asyncio.Queue = asyncio.Queue()
-    _scan_queues[scan_id] = queue
+    _scan_queues[scan_id] = (queue, time.time())
 
     background_tasks.add_task(
         run_scan,
@@ -373,22 +419,21 @@ async def start_scan(
     provider_override: str = Form(None),
     model_override: str = Form(None),
 ):
+    _sweep_stale_scan_queues()
     scan_id = str(uuid.uuid4())
     queue: asyncio.Queue = asyncio.Queue()
-    _scan_queues[scan_id] = queue
+    _scan_queues[scan_id] = (queue, time.time())
 
     apk_path = None
     report_path = None
 
     if apk and apk.filename:
         apk_path = UPLOADS_DIR / f"{scan_id}_{apk.filename}"
-        content = await apk.read()
-        apk_path.write_bytes(content)
+        await _stream_upload_to_file(apk, apk_path)
 
     if report_json and report_json.filename:
         report_path = UPLOADS_DIR / f"{scan_id}_{report_json.filename}"
-        content = await report_json.read()
-        report_path.write_bytes(content)
+        await _stream_upload_to_file(report_json, report_path)
 
     if not apk_path and not report_path:
         raise HTTPException(status_code=400, detail="Provide an APK or MobSF JSON report")
@@ -411,7 +456,7 @@ async def scan_stream(scan_id: str):
         raise HTTPException(status_code=404, detail="Scan not found")
 
     async def event_generator() -> AsyncIterator[dict]:
-        queue = _scan_queues[scan_id]
+        queue, _ = _scan_queues[scan_id]
         while True:
             event = await queue.get()
             yield event
@@ -443,9 +488,10 @@ async def run_scan(
     prior_apkid: dict | None = None,
     prior_quark: dict | None = None,
 ):
-    queue = _scan_queues.get(scan_id)
-    if not queue:
+    entry = _scan_queues.get(scan_id)
+    if not entry:
         return
+    queue, _ = entry
 
     def send(event: str, data: dict | str):
         _send(queue, event, data)
@@ -455,7 +501,7 @@ async def run_scan(
         env = dict(os.environ)
 
         # Build provider
-        from providers import build_provider
+        from providers import build_provider, RETRY_NOTICE_PREFIX
         provider_name = provider_override or env.get("PROVIDER", "ollama")
         try:
             provider = build_provider(provider_name, model_override, env)
@@ -474,6 +520,22 @@ async def run_scan(
         if report_path:
             send("progress", {"stage": "loading", "message": "Loading MobSF report..."})
             raw_report = json.loads(Path(report_path).read_text())
+
+            md5 = raw_report.get("md5")
+            mobsf_key = env.get("MOBSF_API_KEY", "")
+            if md5 and mobsf_key:
+                mobsf_url = env.get("MOBSF_URL", "http://localhost:8000")
+                from mobsf_client import MobSFClient
+                client = MobSFClient(mobsf_url, mobsf_key)
+                raw_report = await asyncio.to_thread(client._merge_scorecard, raw_report, md5)
+
+            # MobSF's report_json export always carries a bare 0 here rather
+            # than omitting the key, so without a real scorecard fetch this
+            # would otherwise render as "Critical Risk" for apps that were
+            # never actually scored that low.
+            if raw_report.get("security_score") == 0:
+                raw_report["security_score"] = "N/A"
+
             send("progress", {"stage": "loading", "message": "Report loaded."})
         elif mobsf_hash:
             mobsf_url = env.get("MOBSF_URL", "http://localhost:8000")
@@ -605,30 +667,37 @@ async def run_scan(
 
         feed_task = asyncio.create_task(_feed_queue())
 
-        try:
-            while True:
-                kind, value = await asyncio.wait_for(chunk_queue.get(), timeout=120)
-                if kind == "error":
-                    is_rate_limit = "rate limit" in value.lower() or "rate limited" in value.lower() or "429" in value
-                    send("error", {
-                        "message": f"AI analysis failed: {value}",
-                        "type": "rate_limit" if is_rate_limit else "error",
-                        "provider": provider_name,
-                    })
-                    feed_task.cancel()
-                    return
-                if kind == "done":
-                    break
-                send("analysis", value)
-                ai_chunks.append(value)
-        except asyncio.TimeoutError:
-            send("error", {
-                "message": "AI analysis timed out after 2 minutes — the model may be busy or the model name is wrong.",
-                "type": "timeout",
-                "provider": provider_name,
-            })
-            feed_task.cancel()
-            return
+        first_chunk_received = False
+
+        while True:
+            timeout_val = INTER_CHUNK_TIMEOUT if first_chunk_received else FIRST_CHUNK_TIMEOUT
+            try:
+                kind, value = await asyncio.wait_for(chunk_queue.get(), timeout=timeout_val)
+            except asyncio.TimeoutError:
+                if first_chunk_received:
+                    message = f"AI analysis stalled mid-response ({INTER_CHUNK_TIMEOUT}s with no data) — try again or switch models."
+                else:
+                    message = f"AI analysis timed out waiting for the first response ({FIRST_CHUNK_TIMEOUT // 60} min) — the model may be busy, offline, or the model name is wrong."
+                send("error", {"message": message, "type": "timeout", "provider": provider_name})
+                feed_task.cancel()
+                return
+            if kind == "chunk" and value.startswith(RETRY_NOTICE_PREFIX):
+                send("progress", {"stage": "retry", "message": value.removeprefix(RETRY_NOTICE_PREFIX)})
+                continue
+            if kind == "error":
+                is_rate_limit = "rate limit" in value.lower() or "rate limited" in value.lower() or "429" in value
+                send("error", {
+                    "message": f"AI analysis failed: {value}",
+                    "type": "rate_limit" if is_rate_limit else "error",
+                    "provider": provider_name,
+                })
+                feed_task.cancel()
+                return
+            if kind == "done":
+                break
+            send("analysis", value)
+            ai_chunks.append(value)
+            first_chunk_received = True
 
         import re as _re
         full_report_raw = "".join(ai_chunks)

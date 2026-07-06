@@ -4,6 +4,33 @@ All notable changes are documented here. Versions follow [Semantic Versioning](h
 
 ---
 
+## [v1.10.0] — 2026-07-06
+
+### Fixes
+
+- **Fixed a stored XSS vulnerability in the history and version-compare views** — app names, package IDs, versions, AI summaries, and verdict labels come from the scanned APK's manifest (or the AI's own output) and were being written into the page without escaping. A maliciously-crafted app name or version string could run arbitrary script in your browser the next time its report appeared in your history or a version comparison. Every untrusted field across both views is now escaped before display.
+- **JSON-uploaded MobSF reports could show a false "0/100 — Critical Risk"** — the "Analyse existing JSON" flow never fetched MobSF's real security score, so it rendered whatever placeholder value (always 0) was baked into the raw export. Now fetches the real score when possible, or shows "N/A" instead of a misleading 0.
+- **AI analysis could be killed prematurely on slow or cold-starting local models** — a flat 2-minute timeout applied to every gap between streamed chunks, even though the app's own progress hint said "large models can take 2–5 min". Replaced with a longer allowance for the model's first response (covers cold-start/model-load) and a shorter stall timeout once it's actually streaming.
+- **A rate-limit retry notice could leak into a saved report** — OpenRouter's "retrying in Ns…" message was written directly into the AI's output stream and could land in the persisted report, occasionally interfering with verdict extraction. It's now shown live as a status update and kept out of the saved report entirely.
+- **Fixed a memory leak on long-running instances** — a scan's progress queue was never cleaned up if the browser tab closed before the analysis view opened. A stale-queue sweep now runs on every new scan, mirroring the existing upload-file cleanup.
+- **Large APK/JSON uploads were fully buffered in memory twice over** — now streamed to disk in chunks with a 500MB cap, so an oversized upload is rejected cleanly instead of risking an out-of-memory crash.
+- **Closed a path-traversal gap on the report-serving endpoint** — brought it in line with the other report endpoints, which already validated filenames.
+- **Fixed a model-tier misclassification** — a cheap/fast model variant from the same generation as a frontier model (e.g. a "-nano" or "-flash-lite" sibling) could be wrongly badged "Frontier".
+
+### Improvements
+
+- **Generated reports now support dark mode** — previously hardcoded light colours regardless of system preference; now follows your system's dark/light setting, matching the app's own (already-dark) interface.
+- **Icon-only buttons (open, download, re-run, delete) now have accessible labels** for screen readers.
+- **Domain list now shows when it's been truncated** — "Showing 20 of N" appears when a scan found more domains than the report displays.
+- **Update check no longer phones home when running fully offline** — skipped entirely when your selected AI provider is Ollama or LM Studio, in line with the app's local-first privacy premise.
+
+### Internal
+
+- Simplified a redundant exception handler in the APKiD client (no behaviour change).
+- Added 15 new tests (68 total) covering all of the above.
+
+---
+
 ## [v1.9.4] — 2026-07-03
 
 ### Documentation

@@ -4,6 +4,12 @@ const $ = id => document.getElementById(id);
 const show = id => $(id)?.classList.remove('hidden');
 const hide = id => $(id)?.classList.add('hidden');
 
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str ?? '';
+  return div.innerHTML;
+}
+
 // ─── State ────────────────────────────────────────────────────────────────────
 const state = {
   view: 'loading',       // loading | wizard | scan | progress | report | history
@@ -36,8 +42,12 @@ async function init() {
     setView('wizard');
   }
 
-  // Check for updates once per session (non-blocking, silent on failure)
-  if (!sessionStorage.getItem('updateChecked')) {
+  // Check for updates once per session (non-blocking, silent on failure) —
+  // but not for a fully-offline provider, since a tool whose selling point
+  // is "the APK never leaves your machine" shouldn't make an unsolicited
+  // call to api.github.com on startup either.
+  const isOffline = PROVIDERS.find(p => p.id === state.selectedProvider)?.type === 'offline';
+  if (!isOffline && !sessionStorage.getItem('updateChecked')) {
     sessionStorage.setItem('updateChecked', '1');
     checkForUpdate();
   }
@@ -557,7 +567,7 @@ function streamProgress(scanId) {
       if (!el) return;
       const msgEl = el.querySelector('.stage-msg');
       let hint = `${analysisSeconds}s elapsed`;
-      if (analysisSeconds >= 20) hint += ' — large models can take 2–5 min';
+      if (analysisSeconds >= 20) hint += ' — large models can take up to 5 min for the first response';
       if (analysisSeconds >= 90) hint += '. Still waiting…';
       msgEl.textContent = hint;
     }, 1000);
@@ -661,7 +671,7 @@ function streamProgress(scanId) {
 
     const errEl = document.createElement('div');
     errEl.className = 'stage error';
-    errEl.innerHTML = `<span class="stage-icon">✕</span><span class="stage-label">Error</span><span class="stage-msg">${msg}</span>`;
+    errEl.innerHTML = `<span class="stage-icon">✕</span><span class="stage-label">Error</span><span class="stage-msg">${escapeHtml(msg)}</span>`;
     stagesEl.appendChild(errEl);
     terminal.textContent += `\n\nError: ${msg.replace(/<[^>]+>/g, '')}`;
 
@@ -680,9 +690,9 @@ function renderMetaCard(data) {
   const cls = score >= 70 ? 'score-ok' : score >= 40 ? 'score-warn' : 'score-crit';
   meta.innerHTML = `
     <div class="meta-grid">
-      <div class="meta-item"><div class="meta-label">App</div><div class="meta-value">${data.app_name || '—'}</div></div>
-      <div class="meta-item"><div class="meta-label">Package</div><div class="meta-value" style="font-size:12px;word-break:break-all">${data.package || '—'}</div></div>
-      <div class="meta-item"><div class="meta-label">Version</div><div class="meta-value">${data.version || '—'}</div></div>
+      <div class="meta-item"><div class="meta-label">App</div><div class="meta-value">${escapeHtml(data.app_name) || '—'}</div></div>
+      <div class="meta-item"><div class="meta-label">Package</div><div class="meta-value" style="font-size:12px;word-break:break-all">${escapeHtml(data.package) || '—'}</div></div>
+      <div class="meta-item"><div class="meta-label">Version</div><div class="meta-value">${escapeHtml(data.version) || '—'}</div></div>
       <div class="meta-item"><div class="meta-label">Security Score</div><div class="meta-value ${cls}">${score}/100</div></div>
       <div class="meta-item"><div class="meta-label">Trackers</div><div class="meta-value ${data.trackers > 3 ? 'score-warn' : ''}">${data.trackers}</div></div>
       <div class="meta-item"><div class="meta-label">Dangerous Perms</div><div class="meta-value ${data.dangerous_perms > 5 ? 'score-crit' : data.dangerous_perms > 2 ? 'score-warn' : ''}">${data.dangerous_perms}</div></div>
@@ -847,8 +857,8 @@ function reportGroup(runs, groupKey) {
 }
 
 function reportCard(r, appNameOverride, isOlder = false) {
-  const appName = appNameOverride || r.app_name || r.name.replace('report_','').replace('.html','').replace(/_(\d{8}_\d{6})$/,'').replace(/_/g,'.');
-  const version = r.version ? `v${r.version}` : '';
+  const appName = escapeHtml(appNameOverride || r.app_name || r.name.replace('report_','').replace('.html','').replace(/_(\d{8}_\d{6})$/,'').replace(/_/g,'.'));
+  const version = r.version ? `v${escapeHtml(r.version)}` : '';
   const score   = r.score ?? null;
   const date    = new Date(r.modified * 1000);
   const dateStr = date.toLocaleDateString(undefined, { day:'numeric', month:'short', year:'numeric' });
@@ -868,9 +878,9 @@ function reportCard(r, appNameOverride, isOlder = false) {
   const vInfo   = verdictMap[vKey];
   const verdictEl = vInfo
     ? `<span class="card-verdict card-verdict-${vInfo.cls}">${vInfo.label}</span>`
-    : (r.risk_label ? `<span class="card-verdict card-verdict-unrated">${r.risk_label}</span>` : '');
+    : (r.risk_label ? `<span class="card-verdict card-verdict-unrated">${escapeHtml(r.risk_label)}</span>` : '');
 
-  const summaryText = r.ai_summary || r.perms_summary || '';
+  const summaryText = escapeHtml(r.ai_summary || r.perms_summary || '');
   const summaryEl = summaryText ? `<div class="card-summary">${summaryText}</div>` : '';
 
   const trackerEl = (r.trackers > 0)
@@ -882,13 +892,13 @@ function reportCard(r, appNameOverride, isOlder = false) {
     const tier   = r.ai_model_tier || 'unknown';
     const label  = r.ai_tier_label || 'Unknown';
     const colour = tierColours[tier] || '#9ca3af';
-    const modelDisplay = r.ai_model.length > 36 ? r.ai_model.slice(0, 34) + '…' : r.ai_model;
+    const modelDisplay = escapeHtml(r.ai_model.length > 36 ? r.ai_model.slice(0, 34) + '…' : r.ai_model);
     return `<div class="card-model"><span class="card-tier-badge" style="background:${colour}">${label}</span><span class="card-model-name">${modelDisplay}</span></div>`;
   })() : '';
 
   // Re-run button — only shown when a MobSF hash is stored
   const rerunBtn = r.md5
-    ? `<button class="btn-icon btn-rerun" title="Re-analyse with a different AI model" onclick="event.stopPropagation();showRerun('${r.name}', this)">⟳</button>`
+    ? `<button class="btn-icon btn-rerun" title="Re-analyse with a different AI model" aria-label="Re-analyse report" onclick="event.stopPropagation();showRerun('${r.name}', this)">⟳</button>`
     : '';
 
   // APKiD pill — only shown when something was flagged (warnings earn their place)
@@ -929,9 +939,9 @@ function reportCard(r, appNameOverride, isOlder = false) {
         <div class="collapsed-model">${tierEl}</div>
         <div class="collapsed-date">${dateStr}</div>
         <div class="card-actions" onclick="event.stopPropagation()">
-          <button class="btn-icon" title="Open" onclick="openReport('${r.url}')">↗</button>
+          <button class="btn-icon" title="Open" aria-label="Open report" onclick="openReport('${r.url}')">↗</button>
           ${rerunBtn}
-          <button class="btn-icon btn-delete" title="Delete" onclick="deleteReport('${r.name}', this)">🗑</button>
+          <button class="btn-icon btn-delete" title="Delete" aria-label="Delete report" onclick="deleteReport('${r.name}', this)">🗑</button>
         </div>
       </div>`;
   }
@@ -941,7 +951,7 @@ function reportCard(r, appNameOverride, isOlder = false) {
       <div class="card-score-wrap">${scoreEl}</div>
       <div class="card-body">
         <div class="card-title">${appName} <span class="card-version">${version}</span></div>
-        <div class="card-package">${r.package || ''}</div>
+        <div class="card-package">${escapeHtml(r.package) || ''}</div>
         ${statusEl}
         ${summaryEl}
         ${trackerEl}
@@ -949,10 +959,10 @@ function reportCard(r, appNameOverride, isOlder = false) {
         ${tierEl}
       </div>
       <div class="card-actions" onclick="event.stopPropagation()">
-        <button class="btn-icon" title="Open" onclick="openReport('${r.url}')">↗</button>
-        <a href="${r.url}" download class="btn-icon" title="Download" style="text-decoration:none;display:inline-flex;align-items:center;justify-content:center;padding:7px 10px">↓</a>
+        <button class="btn-icon" title="Open" aria-label="Open report" onclick="openReport('${r.url}')">↗</button>
+        <a href="${r.url}" download class="btn-icon" title="Download" aria-label="Download report" style="text-decoration:none;display:inline-flex;align-items:center;justify-content:center;padding:7px 10px">↓</a>
         ${rerunBtn}
-        <button class="btn-icon btn-delete" title="Delete" onclick="deleteReport('${r.name}', this)">🗑</button>
+        <button class="btn-icon btn-delete" title="Delete" aria-label="Delete report" onclick="deleteReport('${r.name}', this)">🗑</button>
       </div>
     </div>`;
 }
@@ -1006,10 +1016,10 @@ function renderCompareResult(data) {
   const sideEl = (side, label) => `
     <div class="compare-side">
       <div class="compare-side-label">${label}</div>
-      <div class="compare-side-version">${side.version ? 'v' + side.version : 'Unversioned'}</div>
+      <div class="compare-side-version">${side.version ? 'v' + escapeHtml(side.version) : 'Unversioned'}</div>
       <div class="compare-side-date">${fmtDate(side.timestamp)}</div>
       <div class="compare-side-score">${side.score ?? 'N/A'}<span class="card-score-denom">/100</span></div>
-      ${side.ai_verdict_label ? `<span class="card-verdict card-verdict-${side.ai_verdict_cls}">${side.ai_verdict_label}</span>` : ''}
+      ${side.ai_verdict_label ? `<span class="card-verdict card-verdict-${side.ai_verdict_cls}">${escapeHtml(side.ai_verdict_label)}</span>` : ''}
     </div>`;
 
   const scoreDeltaEl = data.score_delta != null
@@ -1029,8 +1039,8 @@ function renderCompareResult(data) {
     if (!s.added.length && !s.removed.length) {
       return `<div class="compare-section"><div class="compare-section-title">${label}</div><div class="compare-nochange">No changes</div></div>`;
     }
-    const added   = s.added.map(x => `<li class="diff-added">+ ${x}</li>`).join('');
-    const removed = s.removed.map(x => `<li class="diff-removed">− ${x}</li>`).join('');
+    const added   = s.added.map(x => `<li class="diff-added">+ ${escapeHtml(x)}</li>`).join('');
+    const removed = s.removed.map(x => `<li class="diff-removed">− ${escapeHtml(x)}</li>`).join('');
     return `<div class="compare-section"><div class="compare-section-title">${label}</div><ul class="compare-diff-list">${added}${removed}</ul></div>`;
   }).join('');
 

@@ -20,7 +20,7 @@ async def _run_and_drain(scan_id: str, **kwargs) -> list[dict]:
     call_soon_threadsafe-scheduled queue events are actually delivered,
     then return every event that was sent, in order."""
     queue = asyncio.Queue()
-    server._scan_queues[scan_id] = queue
+    server._scan_queues[scan_id] = (queue, time.time())
     await server.run_scan(scan_id=scan_id, **kwargs)
     await asyncio.sleep(0)
     events = []

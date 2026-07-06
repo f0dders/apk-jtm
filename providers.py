@@ -9,6 +9,11 @@ Cloud:  ClaudeProvider, OpenAIProvider, GeminiProvider,
 from __future__ import annotations
 from typing import Iterator
 
+# Prefix marking a diagnostic/retry notice yielded mid-stream (e.g. a rate
+# limit retry) so the caller can route it to the user live without it being
+# treated as AI content and persisted into the saved report.
+RETRY_NOTICE_PREFIX = "\x00RETRY\x00"
+
 
 class OllamaProvider:
     name = "ollama"
@@ -188,7 +193,9 @@ class OpenRouterProvider:
         client = OpenAI(
             base_url="https://openrouter.ai/api/v1",
             api_key=self.api_key,
-            timeout=httpx.Timeout(connect=15.0, read=120.0, write=15.0, pool=5.0),
+            # read=300s matches server.py's first-chunk stall timeout, so a
+            # cold-starting model doesn't trip this before that one applies.
+            timeout=httpx.Timeout(connect=15.0, read=300.0, write=15.0, pool=5.0),
             default_headers={
                 "HTTP-Referer": "https://github.com/apk-analyser",
                 "X-Title": "APK Security Analyser",
@@ -218,7 +225,7 @@ class OpenRouterProvider:
                 except Exception:
                     pass
                 if attempt < max_retries - 1:
-                    yield f"\n\n⏳ Rate limited by upstream provider — retrying in {wait}s (attempt {attempt + 1}/{max_retries})…\n\n"
+                    yield f"{RETRY_NOTICE_PREFIX}⏳ Rate limited by upstream provider — retrying in {wait}s (attempt {attempt + 1}/{max_retries})…"
                     time.sleep(wait)
                 else:
                     raise RuntimeError(

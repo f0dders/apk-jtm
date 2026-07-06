@@ -60,16 +60,26 @@ def _verdict_display(verdict: str | None) -> tuple[str, str]:
     return ("Unrated", "unknown")
 
 
-def _chip(icon: str, label: str, items: list, level: str = "") -> str:
-    """Renders a stat chip. If items are provided, wraps in <details> for expand/collapse."""
+def _chip(icon: str, label: str, items: list, level: str = "", total: int | None = None) -> str:
+    """Renders a stat chip. If items are provided, wraps in <details> for expand/collapse.
+
+    `total` is the true count before any upstream truncation of `items` —
+    when it's larger than len(items), a "Showing N of total" note is added
+    so the chip's summary count (which reflects the true total) doesn't
+    silently disagree with what the expanded list actually shows.
+    """
     cls = f"chip {level}".strip()
     if not items:
         return f'<span class="{cls}"><span class="chip-icon">{icon}</span>{label}</span>'
     items_html = "".join(f"<li>{_esc(str(item))}</li>" for item in items)
+    truncation_note = ""
+    if total is not None and total > len(items):
+        truncation_note = f'<div class="chip-truncation-note">Showing {len(items)} of {total}</div>'
     return (
         f'<details class="{cls}">'
         f'<summary><span class="chip-icon">{icon}</span>{label}</summary>'
         f'<ul class="chip-list">{items_html}</ul>'
+        f'{truncation_note}'
         f'</details>'
     )
 
@@ -79,16 +89,40 @@ def _chip(icon: str, label: str, items: list, level: str = "") -> str:
 # ---------------------------------------------------------------------------
 
 REPORT_CSS = """
+:root {
+  --rc-bg: #f3f4f6;
+  --rc-card-bg: #fff;
+  --rc-text: #111827;
+  --rc-text-secondary: #374151;
+  --rc-text-muted: #6b7280;
+  --rc-text-faint: #9ca3af;
+  --rc-border: #e5e7eb;
+  --rc-border-soft: #d1d5db;
+  --rc-chip-bg: #f9fafb;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --rc-bg: #0c1210;
+    --rc-card-bg: #121c17;
+    --rc-text: #e4f0e8;
+    --rc-text-secondary: #cfe3d6;
+    --rc-text-muted: #7aab8a;
+    --rc-text-faint: #3d6048;
+    --rc-border: #25402e;
+    --rc-border-soft: #25402e;
+    --rc-chip-bg: #192620;
+  }
+}
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
   max-width: 980px; margin: 0 auto; padding: 28px 20px 64px;
-  color: #111827; line-height: 1.65; background: #f3f4f6;
+  color: var(--rc-text); line-height: 1.65; background: var(--rc-bg);
 }
 
 /* ── Header card ── */
 .report-header {
-  background: #fff; border-radius: 16px; padding: 28px 32px;
+  background: var(--rc-card-bg); border-radius: 16px; padding: 28px 32px;
   margin-bottom: 16px; display: flex; align-items: center; gap: 28px;
   box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.05);
 }
@@ -100,20 +134,20 @@ body {
 }
 .app-icon-placeholder {
   width: 72px; height: 72px; border-radius: 16px;
-  background: #f3f4f6; border: 1px solid #e5e7eb;
+  background: var(--rc-bg); border: 1px solid var(--rc-border);
   display: flex; align-items: center; justify-content: center;
   font-size: 2em;
 }
 .header-body { flex: 1; min-width: 0; }
 .app-name {
-  font-size: 1.55em; font-weight: 800; color: #111827;
+  font-size: 1.55em; font-weight: 800; color: var(--rc-text);
   margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .app-package {
-  font-size: 0.88em; color: #6b7280; margin-bottom: 2px;
+  font-size: 0.88em; color: var(--rc-text-muted); margin-bottom: 2px;
   font-family: 'SF Mono', 'Fira Code', monospace;
 }
-.app-meta-line { font-size: 0.82em; color: #9ca3af; margin-bottom: 14px; }
+.app-meta-line { font-size: 0.82em; color: var(--rc-text-faint); margin-bottom: 14px; }
 .risk-badge {
   display: inline-block; padding: 5px 16px; border-radius: 99px;
   font-size: 0.78em; font-weight: 700; letter-spacing: 0.06em;
@@ -131,8 +165,8 @@ body {
 span.chip {
   display: inline-flex; align-items: center; gap: 5px;
   padding: 5px 11px; border-radius: 8px;
-  background: #f9fafb; border: 1px solid #e5e7eb;
-  font-size: 0.82em; font-weight: 500; color: #374151;
+  background: var(--rc-chip-bg); border: 1px solid var(--rc-border);
+  font-size: 0.82em; font-weight: 500; color: var(--rc-text-secondary);
   white-space: nowrap;
 }
 span.chip.warn    { background: #fff7ed; border-color: #fed7aa; color: #c2410c; }
@@ -140,8 +174,8 @@ span.chip.danger  { background: #fef2f2; border-color: #fecaca; color: #dc2626; 
 
 /* Expandable details chip */
 details.chip {
-  border-radius: 8px; border: 1px solid #e5e7eb;
-  background: #f9fafb; font-size: 0.82em; font-weight: 500; color: #374151;
+  border-radius: 8px; border: 1px solid var(--rc-border);
+  background: var(--rc-chip-bg); font-size: 0.82em; font-weight: 500; color: var(--rc-text-secondary);
 }
 details.chip.warn   { background: #fff7ed; border-color: #fed7aa; color: #c2410c; }
 details.chip.danger { background: #fef2f2; border-color: #fecaca; color: #dc2626; }
@@ -167,6 +201,10 @@ details.chip[open] > summary { font-weight: 600; }
   font-size: 0.88em; font-weight: 400;
   font-family: 'SF Mono','Fira Code',monospace;
 }
+.chip-truncation-note {
+  font-size: 0.78em; font-style: italic; color: var(--rc-text-faint);
+  padding: 4px 12px 0;
+}
 details.chip.warn   .chip-list li { background: rgba(194,65,12,0.08); }
 details.chip.danger .chip-list li { background: rgba(220,38,38,0.08); }
 
@@ -174,42 +212,42 @@ details.chip.danger .chip-list li { background: rgba(220,38,38,0.08); }
 
 /* ── Meta strip ── */
 .meta-strip {
-  background: #fff; border-radius: 12px; padding: 13px 24px;
+  background: var(--rc-card-bg); border-radius: 12px; padding: 13px 24px;
   margin-bottom: 16px; display: flex; flex-wrap: wrap; gap: 20px;
   box-shadow: 0 1px 3px rgba(0,0,0,0.06);
-  font-size: 0.83em; color: #6b7280;
+  font-size: 0.83em; color: var(--rc-text-muted);
 }
-.meta-strip span strong { color: #111827; font-weight: 600; }
+.meta-strip span strong { color: var(--rc-text); font-weight: 600; }
 
 /* ── Report body ── */
 .report-body {
-  background: #fff; border-radius: 16px; padding: 36px 40px;
+  background: var(--rc-card-bg); border-radius: 16px; padding: 36px 40px;
   box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.05);
 }
 .report-body h1 {
-  font-size: 1.2em; font-weight: 700; color: #111827;
+  font-size: 1.2em; font-weight: 700; color: var(--rc-text);
   border-left: 4px solid #dc2626; padding-left: 12px;
   margin: 32px 0 12px;
 }
 .report-body h1:first-child { margin-top: 0; }
 .report-body h2 {
-  font-size: 1.1em; font-weight: 700; color: #111827;
+  font-size: 1.1em; font-weight: 700; color: var(--rc-text);
   border-left: 4px solid #dc2626; padding-left: 12px;
   margin: 32px 0 12px;
 }
 .report-body h2:first-child { margin-top: 0; }
 .report-body h3 {
-  font-size: 0.97em; font-weight: 600; color: #374151;
+  font-size: 0.97em; font-weight: 600; color: var(--rc-text-secondary);
   margin: 20px 0 8px;
 }
-.report-body p  { margin-bottom: 12px; color: #374151; }
+.report-body p  { margin-bottom: 12px; color: var(--rc-text-secondary); }
 .report-body ul, .report-body ol { padding-left: 22px; margin-bottom: 12px; }
-.report-body li { margin-bottom: 6px; color: #374151; }
-.report-body strong { color: #111827; }
-.report-body em { color: #6b7280; }
+.report-body li { margin-bottom: 6px; color: var(--rc-text-secondary); }
+.report-body strong { color: var(--rc-text); }
+.report-body em { color: var(--rc-text-muted); }
 .report-body code {
-  background: #f3f4f6; padding: 2px 6px; border-radius: 4px;
-  font-size: 0.84em; font-family: 'SF Mono','Fira Code',monospace; color: #1f2937;
+  background: var(--rc-bg); padding: 2px 6px; border-radius: 4px;
+  font-size: 0.84em; font-family: 'SF Mono','Fira Code',monospace; color: var(--rc-text-secondary);
 }
 .report-body pre {
   background: #1f2937; color: #f9fafb; padding: 16px 20px;
@@ -220,16 +258,16 @@ details.chip.danger .chip-list li { background: rgba(220,38,38,0.08); }
   width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 0.88em;
 }
 .report-body th {
-  background: #f3f4f6; text-align: left; padding: 8px 12px;
-  border: 1px solid #e5e7eb; font-weight: 600;
+  background: var(--rc-bg); text-align: left; padding: 8px 12px;
+  border: 1px solid var(--rc-border); font-weight: 600;
 }
-.report-body td { padding: 8px 12px; border: 1px solid #e5e7eb; }
-.report-body tr:nth-child(even) td { background: #f9fafb; }
+.report-body td { padding: 8px 12px; border: 1px solid var(--rc-border); }
+.report-body tr:nth-child(even) td { background: var(--rc-chip-bg); }
 .report-body blockquote {
-  border-left: 3px solid #d1d5db; padding-left: 14px;
-  margin: 0 0 12px; color: #6b7280;
+  border-left: 3px solid var(--rc-border-soft); padding-left: 14px;
+  margin: 0 0 12px; color: var(--rc-text-muted);
 }
-.report-body hr { border: none; border-top: 1px solid #e5e7eb; margin: 24px 0; }
+.report-body hr { border: none; border-top: 1px solid var(--rc-border); margin: 24px 0; }
 
 /* ── Action verdict ── */
 .verdict-action {
@@ -243,13 +281,13 @@ details.chip.danger .chip-list li { background: rgba(220,38,38,0.08); }
 .verdict-avoid    { background: #fee2e2; color: #991b1b; }
 .verdict-unknown  { background: #f3f4f6; color: #6b7280; }
 .verdict-summary {
-  font-size: 0.83em; color: #374151; margin-top: 8px; line-height: 1.5;
+  font-size: 0.83em; color: var(--rc-text-secondary); margin-top: 8px; line-height: 1.5;
 }
 .verdict-note {
-  font-size: 0.72em; color: #9ca3af; margin-top: 4px; font-style: italic;
+  font-size: 0.72em; color: var(--rc-text-faint); margin-top: 4px; font-style: italic;
 }
 .static-score-note {
-  font-size: 0.72em; color: #9ca3af; margin-top: 6px;
+  font-size: 0.72em; color: var(--rc-text-faint); margin-top: 6px;
 }
 
 /* ── Model tier badge ── */
@@ -258,10 +296,10 @@ details.chip.danger .chip-list li { background: rgba(220,38,38,0.08); }
   margin-top: 14px; flex-wrap: wrap;
 }
 .model-label {
-  font-size: 0.78em; color: #6b7280;
+  font-size: 0.78em; color: var(--rc-text-muted);
 }
 .model-name {
-  font-size: 0.78em; font-weight: 600; color: #374151;
+  font-size: 0.78em; font-weight: 600; color: var(--rc-text-secondary);
   font-family: 'SF Mono','Fira Code',monospace;
 }
 .tier-badge {
@@ -280,7 +318,7 @@ details.chip.danger .chip-list li { background: rgba(220,38,38,0.08); }
 /* ── Footer ── */
 .report-footer {
   text-align: center; margin-top: 20px;
-  font-size: 0.78em; color: #9ca3af;
+  font-size: 0.78em; color: var(--rc-text-faint);
 }
 """
 
@@ -484,7 +522,7 @@ def _build_chips(app_info: dict) -> str:
 
     domains = app_info.get("domains_count", 0)
     level = "warn" if domains > 30 else ""
-    chips.append(_chip("🌐", f"{domains} Domains", app_info.get("domains_list", []), level))
+    chips.append(_chip("🌐", f"{domains} Domains", app_info.get("domains_list", []), level, total=domains))
 
     secrets = app_info.get("secrets_count", 0)
     level = "danger" if secrets > 5 else "warn" if secrets > 0 else ""

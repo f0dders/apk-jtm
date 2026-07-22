@@ -16,7 +16,7 @@ import prompts
 import reporter
 from analyser import stream_analyse
 from mobsf_client import MobSFClient
-from providers import build_provider
+from providers import build_provider, seed_for_hash
 
 load_dotenv()
 console = Console()
@@ -54,6 +54,7 @@ Examples:
     parser.add_argument("--ollama-url", default=os.getenv("OLLAMA_URL", "http://localhost:11434"))
     parser.add_argument("--lmstudio-url", default=os.getenv("LM_STUDIO_URL", "http://localhost:1234"))
     parser.add_argument("--language", default=os.getenv("REPORT_LANGUAGE", "British English"), help="Language for the AI-generated report (default: British English)")
+    parser.add_argument("--context", default=None, help="What you know about this app (who built it, what it does) — helps when the app isn't publicly known")
     parser.add_argument("--output-dir", default=".", help="Directory to save the report")
     parser.add_argument("--save-raw", action="store_true", help="Also save the raw MobSF JSON")
     args = parser.parse_args()
@@ -127,7 +128,18 @@ Examples:
     console.print(f"\n[cyan]Analysing...[/cyan]")
     console.print(Rule())
 
-    prompt = prompts.build_analysis_prompt(extracted, language=args.language)
+    from model_tier import classify as classify_model
+
+    # Tier follows the model, never the provider — a large model run locally is
+    # still a large model.
+    model_tier = classify_model(provider.model)
+    provider.seed = seed_for_hash(extracted["app"].get("md5"))
+    prompt = prompts.build_analysis_prompt(
+        extracted,
+        language=args.language,
+        tier=model_tier,
+        user_context=args.context,
+    )
     ai_output = []
 
     try:
@@ -145,7 +157,22 @@ Examples:
 
     # --- Save report ---
     full_report = "".join(ai_output)
-    app_info = {**extracted["app"], "security_score": score, "average_cvss": extracted["average_cvss"]}
+    app_info = {
+        **extracted["app"],
+        "security_score": score,
+        "average_cvss": extracted["average_cvss"],
+        # Facts the report renders itself rather than asking the AI for. Without
+        # these the CLI's evidence panel reads "not found" for data the scan
+        # actually produced.
+        "signing": extracted.get("signing", {}),
+        "server_locations": extracted["network"].get("server_locations", {}),
+        "exported_counts": extracted["exported_count"],
+        "apkid": extracted.get("apkid", {}),
+        "quark": extracted.get("quark", {}),
+        "ai_model": provider.model,
+        "ai_provider": provider.name,
+        "ai_model_tier": model_tier,
+    }
     report_path = reporter.save_report(app_info, full_report, args.output_dir)
 
     console.print(f"\n[green]Report saved:[/green] {report_path}")

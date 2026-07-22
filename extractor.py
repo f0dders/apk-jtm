@@ -93,6 +93,7 @@ def extract(report: dict) -> dict:
         "receivers": _as_list(report.get("receivers")),
         "providers": _as_list(report.get("providers")),
         "exported_count": _count_exported(report),
+        "signing": _extract_signing(report),
     }
 
 
@@ -141,6 +142,77 @@ def _extract_code_issues(report: dict) -> list:
             })
 
     return issues[:40]
+
+
+def _finding_text(item) -> str:
+    """Flatten one MobSF finding to plain text.
+
+    MobSF has shipped these as dicts, as [severity, title, description] lists,
+    and as bare strings depending on version.
+    """
+    if isinstance(item, dict):
+        return " ".join(str(v) for v in item.values())
+    if isinstance(item, (list, tuple)):
+        return " ".join(str(v) for v in item)
+    return str(item)
+
+
+def _extract_signing(report: dict) -> dict:
+    """Pull explicit signing facts out of MobSF's certificate analysis.
+
+    MobSF describes signing as free text plus a findings list, so an unsigned or
+    debug-signed APK previously reached the AI with no positive signal at all —
+    only the absence of a finding, which is not something a model can reason
+    about. Freshly built and unpublished APKs are exactly the case this matters
+    for, so the facts are surfaced explicitly instead.
+    """
+    cert = _as_dict(report.get("certificate_analysis"))
+    info = cert.get("certificate_info")
+    info_text = info if isinstance(info, str) else ""
+    findings_text = " ".join(
+        _finding_text(f) for f in _as_list(cert.get("certificate_findings"))
+    ).lower()
+
+    if not info_text and not findings_text:
+        return {"available": False, "reason": "No certificate analysis in the MobSF report"}
+
+    fields: dict[str, str] = {}
+    for line in info_text.splitlines():
+        if ":" not in line:
+            continue
+        key, _, value = line.partition(":")
+        fields[key.strip().lower()] = value.strip()
+
+    lowered = info_text.lower()
+    if "binary is not signed" in lowered or "not signed" in findings_text:
+        is_signed = False
+    elif "binary is signed" in lowered or fields.get("x.509 subject"):
+        is_signed = True
+    else:
+        is_signed = None
+
+    versions = [
+        label for label, key in (("v1", "v1 signature"), ("v2", "v2 signature"),
+                                 ("v3", "v3 signature"), ("v4", "v4 signature"))
+        if fields.get(key, "").lower() == "true"
+    ]
+
+    subject = fields.get("x.509 subject", "")
+    issuer = fields.get("issuer", "")
+
+    return {
+        "available": True,
+        "is_signed": is_signed,
+        # MobSF flags the well-known Android debug key by name; a debug-signed
+        # build is a strong hint the APK was never meant for distribution.
+        "is_debug_signed": "debug certificate" in findings_text
+                           or "androiddebugkey" in lowered,
+        "is_self_signed": bool(subject and issuer and subject == issuer),
+        "signature_versions": versions,
+        "subject": subject,
+        "issuer": issuer,
+        "algorithm": fields.get("signature algorithm", ""),
+    }
 
 
 def _extract_network(report: dict) -> dict:

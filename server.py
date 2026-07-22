@@ -14,6 +14,7 @@ FastAPI web server. Handles:
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import os
 import shutil
@@ -69,6 +70,90 @@ MAX_UPLOAD_SIZE = 500 * 1024 * 1024  # 500MB — generous headroom for an APK/JS
 # FIRST_CHUNK_TIMEOUT so it doesn't trip before this one applies.
 FIRST_CHUNK_TIMEOUT = 300
 INTER_CHUNK_TIMEOUT = 90
+
+# Cap on the free-text context a user can attach to a scan.
+MAX_USER_CONTEXT = 2000
+
+# Ollama silently drops the *front* of an over-long prompt — the evidence —
+# while keeping the tail, which is the instruction list. That produces a
+# confident, fully-formed report with nothing behind it, so anything close to
+# the limit has to fail loudly rather than quietly return fiction.
+CONTEXT_SAFETY_MARGIN = 0.8
+
+
+def _parse_verdict_tags(report: str) -> tuple[str | None, str | None, bool]:
+    """Pull the machine-readable VERDICT/SUMMARY trailer out of an AI report.
+
+    Returns (verdict, summary, looks_truncated).
+
+    Takes the LAST match rather than the first: the tags are contractually the
+    final two lines, and an APK that induces the model to echo a forged
+    "VERDICT: LOW" earlier in the report must not win by appearing first.
+
+    A missing verdict means two very different things — the model declined to
+    rate the app, or it ran out of room before reaching the tag. Those read
+    identically to a user, and small local models are the likeliest to stop
+    early, so an incomplete report is distinguished here rather than quietly
+    presented as an unrated one.
+    """
+    import re
+
+    verdicts = re.findall(
+        r'^VERDICT:\s*(LOW|MEDIUM|HIGH|CRITICAL)\s*$',
+        report, re.IGNORECASE | re.MULTILINE,
+    )
+    summaries = re.findall(r'^SUMMARY:\s*(.+)$', report, re.IGNORECASE | re.MULTILINE)
+
+    verdict = verdicts[-1].upper() if verdicts else None
+    summary = summaries[-1].strip() if summaries else None
+
+    # Heading count is the stronger signal — a complete report always has
+    # several sections, whereas length varies legitimately with how much
+    # evidence the scan produced.
+    headings = len(re.findall(r'^##\s', report, re.MULTILINE))
+    truncated = verdict is None and (headings < 3 or len(report) < 1500)
+
+    return verdict, summary, truncated
+
+
+def _prompt_fingerprint(prompt: str) -> str:
+    """Hash the assembled prompt so a re-run can prove its input was identical.
+
+    A pinned seed only reproduces output if the prompt is byte-identical, and a
+    re-run re-fetches from MobSF rather than replaying stored JSON — so a
+    changed cache or a re-ordered domains dict can move the report through no
+    fault of the model.
+    """
+    return hashlib.sha256(prompt.encode("utf-8")).hexdigest()
+
+
+def _estimate_tokens(text: str) -> int:
+    """Cheap, deliberately pessimistic token estimate.
+
+    chars/4 alone under-counts the identifier-dense text this prompt is full of
+    (package names, permission constants, domains), and under-counting is the
+    dangerous direction here — it lets an over-long prompt slip past the guard.
+    """
+    return int(max(len(text) / 4, len(text.split()) * 1.3))
+
+
+def _context_overflow(provider, prompt: str) -> str | None:
+    """Return an error message if the prompt won't safely fit the context window."""
+    limit = getattr(provider, "num_ctx", None)
+    if not limit:
+        return None
+    estimated = _estimate_tokens(prompt)
+    budget = int(limit * CONTEXT_SAFETY_MARGIN)
+    if estimated <= budget:
+        return None
+    return (
+        f"The scan findings are too large for this model's context window "
+        f"(~{estimated:,} tokens needed, {limit:,} available). The model would "
+        f"silently discard the findings and write the report from the "
+        f"instructions alone, which produces confident but baseless output. "
+        f"Raise OLLAMA_NUM_CTX in Settings, or use a model with a larger "
+        f"context window."
+    )
 
 
 async def _stream_upload_to_file(upload: UploadFile, dest: Path, max_size: int = MAX_UPLOAD_SIZE) -> None:
@@ -403,6 +488,11 @@ async def rerun_report(filename: str, payload: dict, background_tasks: Backgroun
         mobsf_hash=md5,
         prior_apkid=meta.get("apkid_full"),
         prior_quark=meta.get("quark_full"),
+        prior_prompt_hash=meta.get("prompt_hash"),
+        # A re-run keeps whatever context the user gave originally unless they
+        # supply new text, so re-analysing with a different model doesn't
+        # silently drop what they told us about the app.
+        user_context=(payload.get("user_context") or meta.get("user_context") or None),
     )
 
     return {"scan_id": scan_id}
@@ -419,6 +509,7 @@ async def start_scan(
     report_json: UploadFile = File(None),
     provider_override: str = Form(None),
     model_override: str = Form(None),
+    user_context: str = Form(None),
 ):
     _sweep_stale_scan_queues()
     scan_id = str(uuid.uuid4())
@@ -446,6 +537,7 @@ async def start_scan(
         report_path=str(report_path) if report_path else None,
         provider_override=provider_override,
         model_override=model_override,
+        user_context=(user_context or "").strip()[:MAX_USER_CONTEXT] or None,
     )
 
     return {"scan_id": scan_id}
@@ -488,6 +580,8 @@ async def run_scan(
     mobsf_hash: str | None = None,
     prior_apkid: dict | None = None,
     prior_quark: dict | None = None,
+    prior_prompt_hash: str | None = None,
+    user_context: str | None = None,
 ):
     entry = _scan_queues.get(scan_id)
     if not entry:
@@ -502,7 +596,7 @@ async def run_scan(
         env = dict(os.environ)
 
         # Build provider
-        from providers import build_provider, RETRY_NOTICE_PREFIX
+        from providers import build_provider, seed_for_hash, RETRY_NOTICE_PREFIX
         provider_name = provider_override or env.get("PROVIDER", "ollama")
         try:
             provider = build_provider(provider_name, model_override, env)
@@ -644,8 +738,38 @@ async def run_scan(
 
         send("progress", {"stage": "analysis", "message": f"Sending to {provider.name}..."})
 
+        # Pin sampling to this APK so re-running the same scan through the same
+        # model reproduces the same report. Set here rather than at build time
+        # because the hash isn't known until the report has been extracted.
+        provider.seed = seed_for_hash(app_info.get("md5"))
+
         from prompts import build_analysis_prompt
-        prompt = build_analysis_prompt(extracted, language=env.get("REPORT_LANGUAGE", "British English"))
+        from model_tier import classify as _classify_model
+
+        # Tier is read from the model, never the provider: a large model run
+        # locally is still a large model and must not be handed the scaffolded
+        # prompt meant for models that need it.
+        model_tier = _classify_model(provider.model)
+        prompt = build_analysis_prompt(
+            extracted,
+            language=env.get("REPORT_LANGUAGE", "British English"),
+            tier=model_tier,
+            user_context=user_context,
+        )
+        full_prompt = f"{prompt.system}\n\n{prompt.user}"
+
+        overflow = _context_overflow(provider, full_prompt)
+        if overflow:
+            send("error", {"message": overflow, "type": "context_overflow", "provider": provider_name})
+            return
+
+        prompt_hash = _prompt_fingerprint(full_prompt)
+        if prior_prompt_hash and prior_prompt_hash != prompt_hash:
+            send("progress", {
+                "stage": "analysis",
+                "message": "Note: the underlying scan data has changed since the last report, "
+                           "so this run is expected to differ.",
+            })
 
         ai_chunks = []
         chunk_queue: asyncio.Queue = asyncio.Queue()
@@ -656,7 +780,7 @@ async def run_scan(
             try:
                 def _run():
                     try:
-                        for chunk in provider.stream(prompt):
+                        for chunk in provider.stream(prompt.user, prompt.system):
                             loop.call_soon_threadsafe(chunk_queue.put_nowait, ("chunk", chunk))
                     except Exception as exc:
                         loop.call_soon_threadsafe(chunk_queue.put_nowait, ("error", str(exc)))
@@ -703,18 +827,7 @@ async def run_scan(
         import re as _re
         full_report_raw = "".join(ai_chunks)
 
-        # Extract machine-readable verdict from last line before rendering
-        verdict_match = _re.search(
-            r'^VERDICT:\s*(LOW|MEDIUM|HIGH|CRITICAL)\s*$',
-            full_report_raw, _re.IGNORECASE | _re.MULTILINE
-        )
-        ai_verdict = verdict_match.group(1).upper() if verdict_match else None
-
-        summary_match = _re.search(
-            r'^SUMMARY:\s*(.+)$',
-            full_report_raw, _re.IGNORECASE | _re.MULTILINE
-        )
-        ai_summary = summary_match.group(1).strip() if summary_match else None
+        ai_verdict, ai_summary, looks_truncated = _parse_verdict_tags(full_report_raw)
 
         # Strip both tag lines from the rendered report
         full_report = _re.sub(
@@ -723,7 +836,6 @@ async def run_scan(
         ).strip()
 
         import reporter
-        from model_tier import classify as _classify_model
 
         # Fetch app icon from MobSF (best-effort; works for APK scans and re-runs)
         icon_b64 = None
@@ -764,11 +876,23 @@ async def run_scan(
             "icon_b64": icon_b64,
             "apkid": extracted.get("apkid", {}),
             "quark": extracted.get("quark", {}),
+            # Facts the report renders itself rather than asking the AI for.
+            "signing": extracted.get("signing", {}),
+            "server_locations": extracted["network"].get("server_locations", {}),
+            "exported_counts": extracted["exported_count"],
             "ai_provider":  provider_name,
             "ai_model":     provider.model,
-            "ai_model_tier": _classify_model(provider.model),
+            "ai_model_tier": model_tier,
             "ai_verdict":   ai_verdict,
             "ai_summary":   ai_summary,
+            "ai_verdict_missing": ai_verdict is None,
+            "ai_truncated": looks_truncated,
+            "prompt_hash":  prompt_hash,
+            "user_context": user_context,
+            "ai_seed":      provider.seed,
+            # False when the backend refused the seed, so the UI never claims
+            # reproducibility the run didn't actually get.
+            "ai_seed_applied": bool(getattr(provider, "seed_applied", False)),
             "perms_summary": _perms_plain(extracted["dangerous_permissions"]),
         }
         report_html_path = reporter.save_report(app_meta, full_report, str(REPORTS_DIR))
@@ -842,20 +966,3 @@ def _perms_plain(dangerous_perms: list) -> str:
     return ", ".join(seen) if seen else ""
 
 
-def _poll_report(client, hash: str):
-    import time
-    import requests
-    for _ in range(60):
-        try:
-            report = client.get_report(hash)
-            if report.get("app_name"):
-                return report
-        except requests.HTTPError:
-            pass
-        time.sleep(3)
-    raise TimeoutError("MobSF scan timed out after 3 minutes.")
-
-
-def _stream_sync(provider, prompt: str) -> list[str]:
-    """Collect streamed chunks in a thread (providers are synchronous)."""
-    return list(provider.stream(prompt))

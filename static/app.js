@@ -467,6 +467,11 @@ async function startScan() {
   if (state.scanFile) form.append('apk', state.scanFile);
   if (state.reportFile) form.append('report_json', state.reportFile);
 
+  // Remembered for the run so a re-analysis with a different model keeps
+  // whatever the user told us about the app.
+  state.userContext = ($('user-context')?.value || '').trim();
+  if (state.userContext) form.append('user_context', state.userContext);
+
   try {
     const res = await fetch('/api/scan/upload', { method: 'POST', body: form });
     if (!res.ok) throw new Error(await res.text());
@@ -779,6 +784,7 @@ async function retryWithModel(provider, modelSlug, btn, wrap) {
   if (state.scanFile) form.append('apk', state.scanFile);
   if (state.reportFile) form.append('report_json', state.reportFile);
   form.append('model_override', modelSlug);
+  if (state.userContext) form.append('user_context', state.userContext);
 
   try {
     const res = await fetch('/api/scan/upload', { method: 'POST', body: form });
@@ -900,6 +906,12 @@ function reportCard(r, appNameOverride, isOlder = false) {
     ? `<div class="card-tracker-warn">⚠ ${r.trackers} tracker${r.trackers > 1 ? 's' : ''} detected</div>`
     : '';
 
+  // An incomplete report and a report the model declined to rate look identical
+  // otherwise, and they mean opposite things.
+  const truncatedEl = r.ai_truncated
+    ? `<div class="card-truncated">⚠ Incomplete — the model stopped before finishing. Re-run this report.</div>`
+    : '';
+
   const tierColours = { frontier: '#10b981', capable: '#3b82f6', basic: '#f59e0b', unknown: '#9ca3af' };
   const tierEl = r.ai_model ? (() => {
     const tier   = r.ai_model_tier || 'unknown';
@@ -966,6 +978,7 @@ function reportCard(r, appNameOverride, isOlder = false) {
         <div class="card-title">${appName} <span class="card-version">${version}</span></div>
         <div class="card-package">${escapeHtml(r.package) || ''}</div>
         ${statusEl}
+        ${truncatedEl}
         ${summaryEl}
         ${trackerEl}
         <div class="card-date">${dateStr} · ${size}</div>

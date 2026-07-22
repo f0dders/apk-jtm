@@ -4,7 +4,7 @@
 
 # APK-JTM — Just tell me if it's dodgy!
 
-[![Version](https://img.shields.io/badge/version-v1.11.0-4ade80?style=flat-square)](https://github.com/f0dders/apk-jtm/releases)
+[![Version](https://img.shields.io/badge/version-v1.12.0-4ade80?style=flat-square)](https://github.com/f0dders/apk-jtm/releases)
 [![Licence](https://img.shields.io/badge/licence-GPL%20v3-blue?style=flat-square)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue?style=flat-square)](https://www.python.org/downloads/)
 

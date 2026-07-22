@@ -4,6 +4,43 @@ All notable changes are documented here. Versions follow [Semantic Versioning](h
 
 ---
 
+## [v1.12.0] — 2026-07-22
+
+Offline-focused release. Running APK-JTM fully offline against a small local model produced
+confident, invented findings on apps the model had no knowledge of — and a different report
+every time you re-ran it. This release fixes both, and hardens the app against APKs that try
+to influence their own report.
+
+### Fixes
+
+- **Offline models no longer invent findings that aren't in the scan** — the report asked for a fixed set of sections including a "Geographic & Server Analysis" naming the countries hosting the app's servers, but when a scan found no geolocation data that section was simply left out of the information given to the AI. Faced with a required heading and no evidence, smaller models filled the gap with plausible-sounding countries for apps that had no network code at all. Sections are now only requested when the scan actually produced evidence for them, and every category the scan checked is reported even when it came back empty, so "nothing found" is stated as a result rather than left as a blank for the model to fill.
+- **Re-running a report on the same app now produces the same report** — no AI provider was pinning a sampling seed, so every regeneration restarted from fresh randomness even though neither the APK nor the MobSF data had changed. Local models (Ollama, LM Studio) are now pinned per-APK and reproduce their previous report. Hosted providers are best-effort, since seeding is only a hint there; current Claude models can't be pinned at all and are labelled accordingly rather than implying a guarantee that doesn't exist.
+- **Unsigned and debug-signed APKs are now detected and reported** — signing state was never extracted, so a freshly built or unpublished APK reached the AI with no indication it wasn't properly signed, while the prompt separately told the model to be harsher on apps it didn't recognise. The report now states signing status explicitly, including debug certificates and self-signed builds.
+- **Closed a prompt-injection gap where a scanned APK could influence its own verdict** — text taken from the APK (its name, extracted strings, code-analysis titles) was placed into the AI's instructions unchanged, so an app could embed its own instructions or forge the machine-readable verdict tag that drives the badge you see. That text is now flattened and defanged before use, held inside a clearly-marked untrusted region the app can't break out of, and the verdict is read from the end of the report so a forged tag planted earlier can't win.
+- **The AI's report output is now sanitised before it's rendered** — report HTML is generated from the model's Markdown, which passed raw HTML straight through. Since the model's input includes text from the APK, that was a route to script running in your browser when viewing a report. Output is now filtered to a safe set of formatting tags.
+- **An incomplete report is no longer shown as simply "unrated"** — a model that ran out of room mid-report and one that genuinely declined to give a verdict looked identical. Reports cut short are now marked as incomplete, with a prompt to re-run them.
+- **Claude reports could be truncated before reaching their verdict** — the response limit was low enough that a detailed report could be cut off just before the verdict and summary lines the app reads, leaving the report unrated. Raised well clear of that.
+
+### New features
+
+- **You can now tell the app what you know about the APK before scanning** — an optional box on the New Scan screen for describing who built the app and what it's meant to do. This matters most for private, internal, or freshly built apps that no AI model could recognise. It's passed to the AI as clearly-labelled unverified context — used to judge whether a behaviour is expected, never accepted as proof the app is safe — and is kept when you re-analyse the same report with a different model.
+- **Reports now open with a "Scan evidence" panel** — signing status, server locations, packer and behaviour findings, and exported components, taken straight from the scan tools and rendered by the app rather than written by the AI. These are facts the model cannot alter or invent, shown before its interpretation of them. It also distinguishes "the tool ran and found nothing" from "the tool didn't run", which previously read the same.
+
+### Improvements
+
+- **The prompt now adapts to the model doing the analysis** — capable models get the report brief as prose; smaller and unrecognised models get the same sections and the same required depth restated as explicit steps, with the evidence repeated where it's needed. Which one you get is decided by the model, not by whether it happens to be running locally, so a large model run offline still gets the full brief.
+- **A scan is now refused, rather than quietly producing fiction, when the findings don't fit the model's context window** — an over-long prompt has its beginning silently discarded by the model, which drops the evidence and keeps the instructions, producing a complete-looking report with nothing behind it. That case now fails with an explanation and a suggested fix.
+- **Clearer guidance on reports written by lightweight or unrecognised models** — the notice now explains that the scan findings are reliable either way and it's the interpretation that varies.
+
+### Internal
+
+- Providers now take an optional system prompt, which is where the analysis rules and the untrusted-data boundary now live — previously everything was a single user message.
+- A fingerprint of each report's input is stored, so a re-analysis can tell you when the underlying scan data changed rather than leaving an unexplained difference in the report.
+- Removed two unused functions left over from earlier refactors.
+- Test suite grown from 70 to 128, covering the hallucination, determinism, signing, injection, and output-sanitisation paths.
+
+---
+
 ## [v1.11.0] — 2026-07-06
 
 ### New features

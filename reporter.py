@@ -1,5 +1,7 @@
 import math
+import re
 from datetime import datetime
+from html.parser import HTMLParser
 from pathlib import Path
 
 import markdown as md
@@ -219,6 +221,36 @@ details.chip.danger .chip-list li { background: rgba(220,38,38,0.08); }
 }
 .meta-strip span strong { color: var(--rc-text); font-weight: 600; }
 
+/* ── Evidence panel ──
+   Rendered from the scan data, never written by the AI. It sits above the
+   analysis so every fact the reader sees is one the model could not invent. */
+.evidence {
+  background: var(--rc-card-bg); border-radius: 16px; padding: 24px 28px;
+  margin-bottom: 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.05);
+}
+.evidence h2 {
+  font-size: 0.95em; font-weight: 700; color: var(--rc-text);
+  margin: 0 0 4px; letter-spacing: 0.01em;
+}
+.evidence-note {
+  font-size: 0.8em; color: var(--rc-text-muted); margin: 0 0 18px;
+}
+.evidence-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px 28px;
+}
+.evidence-item { font-size: 0.86em; min-width: 0; }
+.evidence-label {
+  display: block; font-weight: 600; color: var(--rc-text-secondary);
+  margin-bottom: 4px;
+}
+.evidence-value { color: var(--rc-text); overflow-wrap: anywhere; }
+.evidence-value.is-empty { color: var(--rc-text-muted); font-style: italic; }
+.evidence-value.is-alert { color: #dc2626; font-weight: 600; }
+.evidence-value ul { margin: 0; padding-left: 18px; }
+.evidence-value li { margin: 2px 0; }
+
 /* ── Report body ── */
 .report-body {
   background: var(--rc-card-bg); border-radius: 16px; padding: 36px 40px;
@@ -314,6 +346,9 @@ details.chip.danger .chip-list li { background: rgba(220,38,38,0.08); }
   font-size: 0.83em; color: #92400e; display: flex; gap: 8px; align-items: flex-start;
 }
 .model-disclaimer-icon { flex-shrink: 0; font-size: 1.1em; }
+/* A truncated report is a stronger warning than a model-tier caveat — the
+   analysis genuinely stopped mid-way rather than merely being less thorough. */
+.truncated-notice { background: #fef2f2; border-color: #fecaca; color: #991b1b; }
 
 /* ── Footer ── */
 .report-footer {
@@ -412,6 +447,10 @@ def _build_markdown(app_info: dict, ai_report: str, timestamp: str) -> str:
 
 ---
 
+{_build_evidence_markdown(app_info)}
+
+---
+
 {ai_report}
 """
 
@@ -421,6 +460,7 @@ def _build_html(app_info: dict, ai_report: str, timestamp: str) -> str:
     risk_label, risk_cls, risk_colour = _risk(score)
     ring_svg    = _score_ring_svg(score, risk_colour)
     ai_html     = _render_markdown(ai_report)
+    evidence    = _build_evidence_panel(app_info)
     chips       = _build_chips(app_info)
     dt          = datetime.strptime(timestamp, "%Y%m%d_%H%M%S").strftime("%d %b %Y, %H:%M")
 
@@ -449,6 +489,19 @@ def _build_html(app_info: dict, ai_report: str, timestamp: str) -> str:
             f'<span class="model-name">{_esc(ai_model)}</span>'
             f'<span class="tier-badge" style="background:{tier_colour}">{tier_label}</span>'
             f'</div>'
+        )
+
+    # An incomplete report and one the model chose not to rate look identical
+    # otherwise, and they mean opposite things to a non-technical reader.
+    truncated_html = ""
+    if app_info.get("ai_truncated"):
+        truncated_html = (
+            '<div class="model-disclaimer truncated-notice">'
+            '<span class="model-disclaimer-icon">⚠️</span>'
+            '<span>This report is incomplete — the model stopped before finishing, so no '
+            'verdict was reached. The scan evidence below is complete and reliable; the '
+            'written analysis is not. Re-run the report, ideally with a more capable model.'
+            '</span></div>'
         )
 
     disclaimer_html = ""
@@ -489,13 +542,15 @@ def _build_html(app_info: dict, ai_report: str, timestamp: str) -> str:
   </div>
 </div>
 
-{disclaimer_html}<div class="meta-strip">
+{truncated_html}{disclaimer_html}<div class="meta-strip">
   <span><strong>File:</strong> {_esc(app_info.get('file_name', 'N/A'))}</span>
   <span><strong>Size:</strong> {_esc(str(app_info.get('size', 'N/A')))}</span>
   <span><strong>MD5:</strong> {_esc(app_info.get('md5', 'N/A'))}</span>
   {f'<span><strong>Avg CVSS:</strong> {_esc(str(cvss))}</span>' if (cvss := app_info.get('average_cvss')) and str(cvss).lower() not in ('none', 'n/a', '0', '0.0', '') else ''}
   <span><strong>Generated:</strong> {dt}</span>
 </div>
+
+{evidence}
 
 <div class="report-body">
 {ai_html}
@@ -507,6 +562,145 @@ def _build_html(app_info: dict, ai_report: str, timestamp: str) -> str:
 
 </body>
 </html>"""
+
+
+def _evidence_rows(app_info: dict) -> list[tuple[str, list[str], bool, str]]:
+    """The factual record of the scan, as (label, values, needs_attention, empty_text).
+
+    Built straight from the extracted scan data and rendered by the app, so the
+    reader always sees these facts whether or not the AI mentions them — and the
+    AI cannot invent a different set. An empty `values` list is itself a finding
+    and is rendered as such, never hidden.
+
+    `empty_text` is per-row on purpose: "the tool ran and found nothing" and "the
+    tool never ran" mean very different things, and collapsing them into one
+    generic "none found" is the same conflation this whole change exists to
+    remove.
+    """
+    rows: list[tuple[str, list[str], bool, str]] = []
+
+    signing = app_info.get("signing") or {}
+    if not signing.get("available"):
+        rows.append(("Code signing", [], False, "No certificate data in this scan"))
+    else:
+        notes = []
+        alert = False
+        if signing.get("is_signed") is False:
+            notes.append("Not signed")
+            alert = True
+        elif signing.get("is_signed"):
+            versions = signing.get("signature_versions") or []
+            notes.append("Signed" + (f" ({', '.join(versions)})" if versions else ""))
+        else:
+            notes.append("Signing state unclear")
+        if signing.get("is_debug_signed"):
+            notes.append("Debug certificate — not a release build")
+            alert = True
+        if signing.get("is_self_signed"):
+            notes.append("Self-signed")
+        if signing.get("subject"):
+            notes.append(signing["subject"])
+        rows.append(("Code signing", notes, alert, ""))
+
+    locations = app_info.get("server_locations") or {}
+    rows.append((
+        "Server locations",
+        [f"{country} — {', '.join(domains[:4])}"
+         f"{f' +{len(domains) - 4} more' if len(domains) > 4 else ''}"
+         for country, domains in locations.items()],
+        False,
+        "No geolocation data available",
+    ))
+
+    apkid = app_info.get("apkid") or {}
+    if not apkid.get("available"):
+        rows.append(("Packers & obfuscation", [], False,
+                     "APKiD did not run for this scan"))
+    else:
+        findings = []
+        alert = bool(apkid.get("known_malware_packer"))
+        if apkid.get("packers"):
+            label = ", ".join(apkid["packers"])
+            findings.append(f"Packer: {label}" + (" — known malware packer" if alert else ""))
+        if apkid.get("obfuscators"):
+            findings.append("Obfuscator: " + ", ".join(apkid["obfuscators"]))
+        if apkid.get("anti_vm"):
+            findings.append("Anti-emulator: " + ", ".join(apkid["anti_vm"]))
+        if apkid.get("anti_debug"):
+            findings.append("Anti-debug: " + ", ".join(apkid["anti_debug"]))
+        if not findings:
+            findings.append("Clean — no packer, obfuscator or evasion detected")
+        rows.append(("Packers & obfuscation", findings, alert, ""))
+
+    quark = app_info.get("quark") or {}
+    if not quark.get("available"):
+        rows.append(("Behaviour patterns", [], False,
+                     "Quark-Engine did not run for this scan"))
+    else:
+        crimes = quark.get("top_crimes") or []
+        if crimes:
+            values = [f"{c['crime']} ({c['confidence']})" for c in crimes[:5]]
+        else:
+            values = ["Clean — no malware-associated patterns matched"]
+        rows.append(("Behaviour patterns", values, False, ""))
+
+    exported = app_info.get("exported_counts") or {}
+    rows.append((
+        "Exported components",
+        [f"{name}: {count}" for name, count in exported.items() if count],
+        False,
+        "None exported",
+    ))
+
+    return rows
+
+
+def _build_evidence_panel(app_info: dict) -> str:
+    """Render the scan's factual record as HTML.
+
+    Always rendered, and always placed above the AI analysis — if this becomes
+    conditional or moves below the prose, the model regains room to state facts
+    that nothing on the page contradicts.
+    """
+    items = []
+    for label, values, alert, empty_text in _evidence_rows(app_info):
+        if not values:
+            value_html = (f'<div class="evidence-value is-empty">'
+                          f'{_esc(empty_text or "None found in this scan")}</div>')
+        elif len(values) == 1:
+            cls = "evidence-value is-alert" if alert else "evidence-value"
+            value_html = f'<div class="{cls}">{_esc(values[0])}</div>'
+        else:
+            cls = "evidence-value is-alert" if alert else "evidence-value"
+            lis = "".join(f"<li>{_esc(v)}</li>" for v in values)
+            value_html = f'<div class="{cls}"><ul>{lis}</ul></div>'
+        items.append(
+            f'<div class="evidence-item">'
+            f'<span class="evidence-label">{_esc(label)}</span>{value_html}</div>'
+        )
+
+    return (
+        '<div class="evidence">'
+        '<h2>Scan evidence</h2>'
+        '<p class="evidence-note">Taken directly from the scan tools. '
+        'These facts are not written by the AI.</p>'
+        f'<div class="evidence-grid">{"".join(items)}</div>'
+        '</div>'
+    )
+
+
+def _build_evidence_markdown(app_info: dict) -> str:
+    lines = ["## Scan evidence", "",
+             "_Taken directly from the scan tools. These facts are not written by the AI._", ""]
+    for label, values, _alert, empty_text in _evidence_rows(app_info):
+        if not values:
+            lines.append(f"- **{label}:** {empty_text or 'None found in this scan'}")
+        elif len(values) == 1:
+            lines.append(f"- **{label}:** {values[0]}")
+        else:
+            lines.append(f"- **{label}:**")
+            lines.extend(f"  - {v}" for v in values)
+    return "\n".join(lines)
 
 
 def _build_chips(app_info: dict) -> str:
@@ -563,12 +757,93 @@ def _build_chips(app_info: dict) -> str:
     return "\n".join(chips)
 
 
+# The AI's output is untrusted: its input includes attacker-controlled strings
+# lifted straight out of the APK, and python-markdown passes raw HTML through
+# untouched. Rather than take a new dependency — the offline bundle vendors
+# pinned wheels, so adding one means rebuilding the whole archive — keep to the
+# stdlib and re-emit only known-safe markup.
+_ALLOWED_TAGS = {
+    "p", "br", "hr", "h1", "h2", "h3", "h4", "h5", "h6",
+    "ul", "ol", "li", "dl", "dt", "dd",
+    "strong", "b", "em", "i", "u", "del", "s", "sup", "sub", "span",
+    "code", "pre", "blockquote",
+    "table", "thead", "tbody", "tr", "th", "td",
+    "a",
+}
+_ALLOWED_ATTRS = {
+    "a": {"href", "title"},
+    "th": {"align"},
+    "td": {"align"},
+}
+# Tags whose *contents* are dropped too, not just their markup.
+_DROP_CONTENT_TAGS = {"script", "style", "iframe", "object", "embed", "template"}
+_VOID_TAGS = {"br", "hr"}
+_SAFE_URL = re.compile(r"^(https?://|mailto:|#|/)", re.IGNORECASE)
+
+
+class _HTMLSanitiser(HTMLParser):
+    """Allowlist sanitiser for AI-generated markup.
+
+    Unknown tags are dropped but their text is kept, so a stray `<div>` costs
+    formatting rather than content.
+    """
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.out: list[str] = []
+        self._skip_depth = 0
+
+    def handle_starttag(self, tag, attrs):
+        if tag in _DROP_CONTENT_TAGS:
+            self._skip_depth += 1
+            return
+        if self._skip_depth or tag not in _ALLOWED_TAGS:
+            return
+        allowed = _ALLOWED_ATTRS.get(tag, set())
+        rendered = []
+        for name, value in attrs:
+            if name not in allowed or value is None:
+                continue
+            if name == "href" and not _SAFE_URL.match(value.strip()):
+                continue
+            rendered.append(f' {name}="{_esc(value)}"')
+        closing = " /" if tag in _VOID_TAGS else ""
+        self.out.append(f"<{tag}{''.join(rendered)}{closing}>")
+
+    def handle_startendtag(self, tag, attrs):
+        # A self-closing tag has no content, so a drop-content tag here must not
+        # open a skip region — no matching end tag will ever arrive to close it,
+        # and everything after would be silently swallowed.
+        if tag in _DROP_CONTENT_TAGS:
+            return
+        self.handle_starttag(tag, attrs)
+
+    def handle_endtag(self, tag):
+        if tag in _DROP_CONTENT_TAGS:
+            self._skip_depth = max(0, self._skip_depth - 1)
+            return
+        if self._skip_depth or tag not in _ALLOWED_TAGS or tag in _VOID_TAGS:
+            return
+        self.out.append(f"</{tag}>")
+
+    def handle_data(self, data):
+        if not self._skip_depth:
+            self.out.append(_esc(data))
+
+
+def _sanitise_html(html: str) -> str:
+    parser = _HTMLSanitiser()
+    parser.feed(html)
+    parser.close()
+    return "".join(parser.out)
+
+
 def _render_markdown(text: str) -> str:
-    return md.markdown(
+    return _sanitise_html(md.markdown(
         text,
         extensions=["extra", "sane_lists"],
         output_format="html",
-    )
+    ))
 
 
 def _esc(text: str) -> str:

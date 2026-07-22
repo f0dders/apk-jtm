@@ -157,6 +157,17 @@
         </div>
       </div>
 
+      <div class="card context-card">
+        <label class="context-label" for="user-context">What do you know about this app? <span class="context-optional">optional</span></label>
+        <div class="context-hint">
+          Who built it, and what is it meant to do? Helpful when the app isn't publicly
+          known — the AI has no way to recognise a private or freshly built APK, and
+          will say so rather than guess.
+        </div>
+        <textarea id="user-context" class="context-input" rows="3" maxlength="2000"
+                  placeholder="e.g. Internal tool built by our team to log warehouse stock. Unsigned because it's a test build."></textarea>
+      </div>
+
       <div style="margin-top:24px;text-align:right">
         <button class="btn-primary" id="btn-start-scan" onclick="startScan()" disabled style="padding:11px 28px;font-size:14px">
           Scan APK

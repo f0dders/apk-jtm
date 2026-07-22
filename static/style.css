@@ -97,6 +97,27 @@ select option { background: var(--surface2); }
 .info-box { font-size: 13px; color: var(--text-muted); background: rgba(74,222,128,0.07); border: 1px solid rgba(74,222,128,0.2); border-radius: 8px; padding: 10px 14px; margin-top: 4px; line-height: 1.5; }
 .info-box code { background: rgba(255,255,255,0.08); padding: 1px 5px; border-radius: 4px; font-size: 12px; }
 
+/* Optional context the user can attach to a scan. Matters most for private or
+   freshly built APKs, where the model has no way to recognise the app. */
+.context-card { margin-top: 16px; padding: 18px 20px; }
+.context-label {
+  text-transform: none; letter-spacing: normal; font-size: 14px;
+  font-weight: 600; color: var(--text); margin-bottom: 4px;
+}
+.context-optional {
+  text-transform: uppercase; letter-spacing: 0.05em; font-size: 11px;
+  font-weight: 500; color: var(--text-dim); margin-left: 6px;
+}
+.context-hint { font-size: 12px; color: var(--text-muted); line-height: 1.5; margin-bottom: 10px; }
+.context-input {
+  width: 100%; background: var(--surface2); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); color: var(--text);
+  padding: 9px 12px; font-size: 14px; font-family: inherit; line-height: 1.5;
+  resize: vertical; min-height: 68px; transition: border 0.15s;
+}
+.context-input:focus { outline: none; border-color: var(--accent); }
+.context-input::placeholder { color: var(--text-dim); }
+
 /* Wizard */
 #wizard { max-width: 600px; margin: 0 auto; }
 .wizard-steps {
@@ -272,6 +293,10 @@ select option { background: var(--surface2); }
 .card-verdict-unrated { background: var(--surface); color: var(--text-muted); border: 1px solid var(--border); }
 .card-summary { font-size: 12px; color: var(--text-muted); line-height: 1.45; margin-bottom: 4px; }
 .card-tracker-warn { font-size: 11px; color: #ef4444; font-weight: 600; margin-bottom: 3px; }
+.card-truncated {
+  font-size: 11px; color: var(--orange); font-weight: 600; margin: 4px 0 3px;
+  line-height: 1.4;
+}
 .card-apkid { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 12px; border-radius: 99px; margin-left: 6px; vertical-align: middle; }
 .card-apkid-danger { background: #fee2e2; color: #991b1b; }
 .card-apkid-warn   { background: #fff7ed; color: #c2410c; }

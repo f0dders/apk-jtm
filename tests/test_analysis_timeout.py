@@ -41,7 +41,7 @@ class _SlowFirstChunkProvider:
     name = "fake"
     model = "fake-model"
 
-    def stream(self, prompt):
+    def stream(self, prompt, system=None):
         time.sleep(0.2)  # exceeds the monkeypatched FIRST_CHUNK_TIMEOUT
         yield "should never get here"
 
@@ -50,7 +50,7 @@ class _StallsMidStreamProvider:
     name = "fake"
     model = "fake-model"
 
-    def stream(self, prompt):
+    def stream(self, prompt, system=None):
         yield "first chunk arrives fine"
         time.sleep(0.2)  # exceeds the monkeypatched INTER_CHUNK_TIMEOUT
         yield "should never get here"

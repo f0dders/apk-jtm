@@ -34,7 +34,7 @@ class _RetryThenSucceedsProvider:
     name = "fake"
     model = "fake-model"
 
-    def stream(self, prompt):
+    def stream(self, prompt, system=None):
         yield f"{RETRY_NOTICE_PREFIX}⏳ Rate limited by upstream provider — retrying in 1s (attempt 1/3)…"
         yield "Here is the analysis.\n"
         yield "VERDICT: LOW\n"

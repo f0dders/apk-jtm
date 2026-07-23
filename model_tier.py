@@ -4,7 +4,11 @@ Only classifies models we're confident about — everything else is 'unknown'.
 """
 from __future__ import annotations
 
-# Patterns are matched case-insensitively as substrings of the model ID.
+# Patterns are matched case-insensitively as substrings of the model ID, written
+# with hyphens throughout. Ollama and LM Studio name the same models with a
+# colon before the size ("qwen3.5:9b"), so classify() normalises the separator
+# before matching — without that, every locally-run model fell through to
+# 'unknown' and every local report carried the unclassified-model disclaimer.
 # Order within each tier doesn't matter; first match in tier order wins.
 
 _FRONTIER = [
@@ -27,6 +31,9 @@ _FRONTIER = [
     "mixtral-8x22b",
     # Alibaba
     "qwen3.6-27b", "qwen3.6-35b",
+    "qwen3.5-27b", "qwen3.5-35b",
+    # Google
+    "gemma4-26b", "gemma4-31b",
 ]
 
 _CAPABLE = [
@@ -34,8 +41,10 @@ _CAPABLE = [
     "claude-haiku",
     # OpenAI
     "gpt-4o-mini", "gpt-3.5-turbo", "gpt-oss-20b",
-    # Google
-    "gemini-1.5-flash", "gemini-flash",
+    # Google — "-flash" catches the whole fast line ("gemini-2.5-flash"), which
+    # the version-specific patterns above miss.
+    "gemini-1.5-flash", "gemini-flash", "-flash", "-mini",
+    "gemma4-12b", "gemma3-12b", "gemma3-27b",
     # Meta
     "llama-3.1-70b", "llama-3-70b", "llama-3.3-70b-instruct",
     # Mistral
@@ -59,19 +68,26 @@ _BASIC = [
     # Google small
     "gemma-",
     # Microsoft small
-    "phi-",
+    "phi-", "phi3", "phi4",
+    # Google small — gemma4's edge variants (e2b/e4b) are on-device models
+    "gemma4-e",
     # Small Qwen
     "qwen2.5-7b", "qwen-7b",
     # Generic small param indicators at end of model slug
-    "-1b", "-3b", "-7b", "-8b",
+    "-1b", "-2b", "-3b", "-4b", "-7b", "-8b", "-nano",
 ]
 
-# A few _FRONTIER entries are version-prefixes ("gpt-5", "gemini-2.") rather
-# than full model names, so they'd also match that generation's cheap/fast
-# siblings (e.g. "gpt-5-nano", "gemini-2.0-flash-lite"). Skip the frontier
-# match when one of these qualifiers appears after it — such a slug falls
-# through to capable/basic/unknown instead of being wrongly badged Frontier.
-_FRONTIER_CHEAP_QUALIFIERS = ("-flash", "-nano", "-mini", "-lite")
+# A few _FRONTIER entries are version-prefixes ("gpt-5", "gemini-2.") or family
+# names ("deepseek-r1") rather than full model names, so they'd also match that
+# generation's cheap/fast siblings ("gpt-5-nano", "gemini-2.0-flash-lite") and
+# its small local distillations ("deepseek-r1:14b" — a 14B distil sharing the
+# name of a 671B model). Skip the frontier match when one of these qualifiers
+# appears after it — such a slug falls through to capable/basic/unknown instead
+# of being wrongly badged Frontier.
+_FRONTIER_CHEAP_QUALIFIERS = (
+    "-flash", "-nano", "-mini", "-lite",
+    "-1.5b", "-7b", "-8b", "-14b", "-32b",
+)
 
 # (display_label, hex_colour, description_for_disclaimer)
 TIER_META: dict[str, tuple[str, str, str]] = {
@@ -94,7 +110,7 @@ TIER_META: dict[str, tuple[str, str, str]] = {
 
 def classify(model: str) -> str:
     """Return 'frontier', 'capable', 'basic', or 'unknown'."""
-    m = model.lower()
+    m = model.lower().replace(":", "-")
     for pattern in _FRONTIER:
         idx = m.find(pattern)
         if idx == -1:

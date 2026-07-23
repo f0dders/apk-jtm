@@ -4,7 +4,7 @@
 
 # APK-JTM — Just tell me if it's dodgy!
 
-[![Version](https://img.shields.io/badge/version-v1.12.0-4ade80?style=flat-square)](https://github.com/f0dders/apk-jtm/releases)
+[![Version](https://img.shields.io/badge/version-v1.13.0-4ade80?style=flat-square)](https://github.com/f0dders/apk-jtm/releases)
 [![Licence](https://img.shields.io/badge/licence-GPL%20v3-blue?style=flat-square)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue?style=flat-square)](https://www.python.org/downloads/)
 
@@ -157,14 +157,20 @@ The Quick Start above needs internet for Python/Docker setup and to pull MobSF's
 
 | Provider | Setup | Recommended model |
 |---|---|---|
-| **Ollama** | Install from [ollama.com](https://ollama.com), run `ollama pull qwen2.5-coder:32b` | `qwen2.5-coder:32b` (~20 GB) — the app's built-in default |
+| **Ollama** | Install from [ollama.com](https://ollama.com), run `ollama pull gemma4:12b` | `gemma4:12b` (7.6 GB) — the app's built-in default |
 | **LM Studio** | Install from [lmstudio.ai](https://lmstudio.ai), load a model, start the server | Any GGUF model |
 
-**Apple Silicon recommendations (by RAM tier):** the built-in default above is a solid, code-analysis-tuned choice, but these are worth trying too:
-- **16 GB** — `qwen3.5:9b`, ~6.6 GB, punches well above its size on reasoning
-- **24–32 GB** — `qwen3.6:27b`, flagship-class output at ~17 GB
-- **32 GB+** — `gpt-oss:20b` (Apache 2.0, strong reasoning, ~16 GB) or `qwen3.6:35b`
-- **80 GB+** — `gpt-oss:120b`, closer to frontier cloud quality, fully offline
+**Ollama models by hardware tier:**
+
+| Tier | Model | Size | Why |
+|---|---|---|---|
+| **8–16 GB RAM** | `gemma4:12b` | 7.6 GB, 256K context | Best hallucination rate in its class; this app's worst failure mode is a model inventing a developer or country for an app it doesn't recognise, not shallow reasoning. The app's default. |
+| **16–24 GB** | `qwen3.5:9b` | 6.6 GB, 256K context | Leaner and faster per token, slightly weaker on the knowledge/hallucination axis. |
+| **24–32 GB** | `gemma4:26b` | 18 GB, mixture-of-experts, 3.8B active parameters | The MoE design keeps it fast on unified memory despite its size. |
+| **32 GB+** | `qwen3.6:27b` or `gemma4:31b` | 17 GB / 20 GB | Closest to cloud-tier judgement you can run locally. |
+| **80 GB+** | `gpt-oss:120b` | 65 GB | Approaches frontier cloud quality, fully offline. |
+
+**Not recommended:** Coder tunes like `qwen2.5-coder` or `qwen3-coder` are optimised for code completion and are weaker at hedged prose and at admitting they don't recognise an app. Sub-8B models are the ones most likely to invent developers, purposes, and countries — the exact failure mode the app's prompt design exists to prevent. `gpt-oss:20b` still works but is nine months old and no longer the obvious pick at 14 GB.
 
 > Local model rankings move fast — these are current as of mid-2026. Whatever you pick, check `ollama pull <model>` works before relying on it for a scan.
 
@@ -206,6 +212,8 @@ APKiD requires **Python 3.12** due to a native dependency. The launcher handles 
 [Quark-Engine](https://github.com/quark-engine/quark-engine) runs in parallel with MobSF and APKiD, matching API-call patterns against a database of ~280 community rules covering known malware-family behaviours — banking trojans, spyware, persistence/evasion techniques, and more.
 
 Unlike APKiD's malware-packer detection, Quark's "threat level" is a mechanical score with no awareness of what an app actually is — many legitimate apps (system tools, package managers) trigger a Moderate or High threat level purely because they use APIs also common in malware. The AI is instructed to weigh each matched behaviour in context rather than trust the threat level blindly, exactly as it does for permissions and other findings.
+
+For the same reason, the report card shows how many behaviour patterns matched rather than Quark's threat level, and a match never withholds the "Safe to use" badge on its own — what those patterns mean is a question for the report, not the badge.
 
 Quark-Engine is pure Python — no native build tools required, unlike APKiD. Its rule database is fetched once via `freshquark` (needs internet for that one step), then every scan runs entirely offline against the local copy. The launcher handles installation and the initial rule fetch automatically; if it can't be installed or the rules aren't available, the scan continues normally without behavioural analysis.
 
@@ -273,6 +281,8 @@ Close the terminal window that opened when you launched the app. MobSF continues
 **Ollama model not found** — run `ollama pull <model-name>` in a terminal before launching.
 
 **Slow first launch** — dependencies install on first run (1–3 minutes). Subsequent launches are instant.
+
+**"No internet — skipping dependency updates"** — expected, not an error. Once the app has been set up, it runs entirely offline; the launcher only checks for dependency updates when it can reach the package index. If this appears on a machine that has never run the app before, it will stop and say so — the first run needs a connection once, or use the offline bundle in [docs/OFFLINE.md](docs/OFFLINE.md).
 
 **Mac Gatekeeper warning** — right-click `Start - Mac.command` → Open → Open. One-time step.
 

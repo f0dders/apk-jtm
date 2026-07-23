@@ -21,6 +21,32 @@ confirm() {
   done
 }
 
+# ── Helper: run pip quietly, showing its output only if it actually failed ────
+# pip logs its connection retries at WARNING level, which -q does not suppress
+# and which go to stderr. On a machine with no internet that is five red lines
+# per package — alarming, and misleading, because pip then falls back to the
+# installed version and exits 0. Capturing and discarding on success keeps a
+# real failure fully visible while a routine one stays silent.
+pip_quiet() {
+  local log
+  log=$(mktemp)
+  if pip "$@" --retries 2 --timeout 15 -q >"$log" 2>&1; then
+    rm -f "$log"
+    return 0
+  fi
+  cat "$log"
+  rm -f "$log"
+  return 1
+}
+
+# ── Helper: is the package index reachable? ───────────────────────────────────
+# Checked once, up front, so an offline launch skips the dependency step
+# deliberately rather than discovering it five retries at a time.
+ONLINE=1
+if ! curl -fsS --max-time 4 -o /dev/null https://pypi.org/simple/ 2>/dev/null; then
+  ONLINE=0
+fi
+
 # ── Detect package manager ────────────────────────────────────────────────────
 PKG_MGR=""
 if   command -v apt-get &>/dev/null; then PKG_MGR="apt"
@@ -127,38 +153,68 @@ fi
 source .venv/bin/activate
 
 # ── Core dependencies ─────────────────────────────────────────────────────────
-echo -e "  ${CYAN}Checking dependencies...${RESET}"
-if ! pip install -r requirements.txt --upgrade -q; then
-  echo -e "${RED}  [ERROR] Failed to install dependencies.${RESET}"
-  echo "  Check your internet connection and try again."
-  read -rp "  Press Enter to close..."
-  exit 1
-fi
-echo -e "  ${GREEN}✓${RESET} Dependencies ready"
-
-# ── APKiD (optional) ──────────────────────────────────────────────────────────
-if pip install apkid -q 2>/dev/null; then
-  echo -e "  ${GREEN}✓${RESET} APKiD ready (packer analysis enabled)"
+if [ "$ONLINE" -eq 0 ]; then
+  echo -e "  ${YELLOW}No internet${RESET} — skipping dependency updates, using what's already installed."
+  # An offline launch is fine on a machine that has run once before, and
+  # impossible on one that hasn't. The imports say which of the two this is.
+  if ! python -c "import fastapi, uvicorn" 2>/dev/null; then
+    echo ""
+    echo -e "${RED}  [ERROR] Dependencies are not installed, and there is no internet to fetch them.${RESET}"
+    echo "  The first run needs a connection once. After that the app runs offline."
+    echo "  For a machine that will never have one, use the offline install bundle"
+    echo "  (see docs/OFFLINE.md)."
+    echo ""
+    read -rp "  Press Enter to close..."
+    exit 1
+  fi
+  echo -e "  ${GREEN}✓${RESET} Dependencies ready (offline)"
 else
-  echo -e "  ${YELLOW}Note:${RESET} APKiD unavailable on Python $PY_VER — packer analysis skipped"
-  if [ "$MINOR_ONLY" -ge 14 ] && ! command -v python3.12 &>/dev/null; then
-    echo "        To enable: install Python 3.12 and re-run this launcher"
-  fi
-fi
-
-# ── Quark-Engine (pure Python — no native build tools needed) ─────────────────
-if pip install quark-engine -q 2>/dev/null; then
-  if [ ! -d "$HOME/.quark-engine/quark-rules/rules" ]; then
-    echo -e "  ${CYAN}Fetching Quark-Engine rule database (one-time, needs internet)...${RESET}"
-    freshquark &>/dev/null || true
-  fi
-  if [ -d "$HOME/.quark-engine/quark-rules/rules" ]; then
-    echo -e "  ${GREEN}✓${RESET} Quark-Engine ready (behavioural pattern analysis enabled)"
+  echo -e "  ${CYAN}Checking dependencies...${RESET}"
+  if pip_quiet install -r requirements.txt --upgrade; then
+    echo -e "  ${GREEN}✓${RESET} Dependencies ready"
+  elif python -c "import fastapi, uvicorn" 2>/dev/null; then
+    # pip failing does not mean the app cannot run — the previously installed
+    # versions are still there. Say what happened and carry on.
+    echo -e "  ${YELLOW}Note:${RESET} Could not update dependencies (see above) — continuing with the installed versions."
   else
-    echo -e "  ${YELLOW}Note:${RESET} Quark-Engine rule database unavailable (no internet on first run?) — run 'freshquark' manually later"
+    echo -e "${RED}  [ERROR] Failed to install dependencies, and none are installed to fall back on.${RESET}"
+    read -rp "  Press Enter to close..."
+    exit 1
   fi
-else
-  echo -e "  ${YELLOW}Note:${RESET} Quark-Engine install failed — behavioural analysis skipped"
+
+  # ── APKiD (optional) ──────────────────────────────────────────────────────
+  if pip install apkid -q --retries 2 --timeout 15 &>/dev/null; then
+    echo -e "  ${GREEN}✓${RESET} APKiD ready (packer analysis enabled)"
+  else
+    echo -e "  ${YELLOW}Note:${RESET} APKiD unavailable on Python $PY_VER — packer analysis skipped"
+    if [ "$MINOR_ONLY" -ge 14 ] && ! command -v python3.12 &>/dev/null; then
+      echo "        To enable: install Python 3.12 and re-run this launcher"
+    fi
+  fi
+
+  # ── Quark-Engine (pure Python — no native build tools needed) ──────────────
+  if pip install quark-engine -q --retries 2 --timeout 15 &>/dev/null; then
+    if [ ! -d "$HOME/.quark-engine/quark-rules/rules" ]; then
+      echo -e "  ${CYAN}Fetching Quark-Engine rule database (one-time, needs internet)...${RESET}"
+      freshquark &>/dev/null || true
+    fi
+    if [ -d "$HOME/.quark-engine/quark-rules/rules" ]; then
+      echo -e "  ${GREEN}✓${RESET} Quark-Engine ready (behavioural pattern analysis enabled)"
+    else
+      echo -e "  ${YELLOW}Note:${RESET} Quark-Engine rule database unavailable — run 'freshquark' manually later"
+    fi
+  else
+    echo -e "  ${YELLOW}Note:${RESET} Quark-Engine install failed — behavioural analysis skipped"
+  fi
+fi
+
+# Optional tools already installed from an earlier online run still work
+# offline, so report them rather than staying silent about them.
+if [ "$ONLINE" -eq 0 ]; then
+  command -v apkid &>/dev/null \
+    && echo -e "  ${GREEN}✓${RESET} APKiD ready (packer analysis enabled)"
+  [ -d "$HOME/.quark-engine/quark-rules/rules" ] && command -v quark &>/dev/null \
+    && echo -e "  ${GREEN}✓${RESET} Quark-Engine ready (behavioural pattern analysis enabled)"
 fi
 echo ""
 
@@ -180,14 +236,25 @@ if ! command -v docker &>/dev/null; then
   echo ""
 else
   if ! curl -s --max-time 3 http://localhost:8000 &>/dev/null; then
-    echo -e "  ${CYAN}Starting MobSF (Docker)...${RESET}"
-    mkdir -p "$HOME/.mobsf"
-    docker run -d --name mobsf -p 8000:8000 \
-      -v "$HOME/.mobsf:/home/mobsf/.MobSF" \
-      opensecurity/mobile-security-framework-mobsf 2>/dev/null \
-      || docker start mobsf 2>/dev/null \
-      || true
-    echo -e "  ${GREEN}✓${RESET} MobSF starting at http://localhost:8000"
+    # `docker run` on a missing image triggers a pull, which offline means a
+    # long wait and a failure. Only reach for it when the image is already
+    # local or there is a connection to fetch it with.
+    if docker image inspect opensecurity/mobile-security-framework-mobsf &>/dev/null || [ "$ONLINE" -eq 1 ]; then
+      echo -e "  ${CYAN}Starting MobSF (Docker)...${RESET}"
+      mkdir -p "$HOME/.mobsf"
+      docker run -d --name mobsf -p 8000:8000 \
+        -v "$HOME/.mobsf:/home/mobsf/.MobSF" \
+        opensecurity/mobile-security-framework-mobsf &>/dev/null \
+        || docker start mobsf &>/dev/null \
+        || true
+      echo -e "  ${GREEN}✓${RESET} MobSF starting at http://localhost:8000"
+    elif docker start mobsf &>/dev/null; then
+      echo -e "  ${GREEN}✓${RESET} MobSF starting at http://localhost:8000"
+    else
+      echo -e "  ${YELLOW}Note:${RESET} MobSF isn't running and its image isn't downloaded yet —"
+      echo "        scanning needs a connection once to fetch it. You can still load"
+      echo "        an existing MobSF JSON report offline."
+    fi
   else
     echo -e "  ${GREEN}✓${RESET} MobSF already running"
   fi

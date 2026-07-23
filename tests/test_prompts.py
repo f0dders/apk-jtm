@@ -210,3 +210,58 @@ def test_prompt_is_stable_across_builds():
     a = prompts.build_analysis_prompt(MINIMAL_EXTRACTED)
     b = prompts.build_analysis_prompt(MINIMAL_EXTRACTED)
     assert a == b
+
+
+# ── Completeness ────────────────────────────────────────────────────────────
+
+def test_app_context_section_does_not_instruct_model_to_stop_early():
+    """App Context section used to tell the model "and stop", which caused
+    compliant models to end their entire report after one sentence, producing
+    truncated reports with no VERDICT trailer that the UI then flagged as broken.
+    The instruction was removed; verify it does not reappear.
+    """
+    for tier in ("frontier", "basic"):
+        prompt = prompts.build_analysis_prompt(MINIMAL_EXTRACTED, tier=tier)
+        assert "and stop" not in prompt.user, f"Found 'and stop' in {tier} tier"
+
+
+def test_privacy_concerns_section_is_evidence_gated():
+    """Privacy Concerns section is optional, like every other optional section.
+    It should appear only when there is privacy-relevant evidence to report on:
+    dangerous permissions or tracking SDKs.
+    """
+    # No privacy evidence — section must be absent
+    prompt_empty = prompts.build_analysis_prompt(MINIMAL_EXTRACTED)
+    assert "## Privacy Concerns" not in prompt_empty.user
+
+    # With dangerous permissions — section must be present
+    prompt_with_perms = prompts.build_analysis_prompt(_with(
+        dangerous_permissions=[
+            {
+                "name": "android.permission.CAMERA",
+                "description": "take pictures and videos"
+            }
+        ]
+    ))
+    assert "## Privacy Concerns" in prompt_with_perms.user
+
+    # With trackers — section must be present
+    prompt_with_trackers = prompts.build_analysis_prompt(_with(
+        trackers=["Google Analytics"]
+    ))
+    assert "## Privacy Concerns" in prompt_with_trackers.user
+
+
+def test_no_packer_brand_names_appear_in_prompt():
+    """The packer escalation rule used to list specific malware packer names
+    as examples (Bangcle, SecNeo, Jiagu, DexProtect), which invited a model to
+    name a packer the scan never found. The rule now points at the ⚠ KNOWN
+    MALWARE PACKER marker in the evidence instead. Verify the brand names do
+    not appear in the prompt for either tier.
+    """
+    banned_names = ("Bangcle", "SecNeo", "Jiagu", "DexProtect")
+
+    for tier in ("frontier", "basic"):
+        prompt = prompts.build_analysis_prompt(MINIMAL_EXTRACTED, tier=tier)
+        for name in banned_names:
+            assert name not in prompt.user, f"Found '{name}' in {tier} tier"

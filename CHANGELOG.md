@@ -4,6 +4,31 @@ All notable changes are documented here. Versions follow [Semantic Versioning](h
 
 ---
 
+## [v1.13.0] — 2026-07-23
+
+Three things made the app look broken when it wasn't. An app the AI didn't recognise — the
+normal case for an internal or unpublished build — produced a report that stopped after one
+sentence. Launching without internet buried the startup in pip connection errors before
+working perfectly. And a clean app almost never earned its "Safe to use" badge, because a
+mechanical behaviour score was allowed to veto it. This release fixes all three, and refreshes
+the local-model recommendations while it's there.
+
+### Fixes
+
+- **Reports no longer stop after one sentence when the AI does not recognise the app** — the prompt told the model to "say exactly that and stop"; models that followed the instruction ended their whole response, and the app then flagged the result as an incomplete report. An unrecognised app is the normal case for an internal or unpublished build, so this fired constantly.
+- **Launching with no internet no longer looks like a failure** — the launcher now checks once whether the package index is reachable and skips the dependency step deliberately, instead of letting pip print dozens of connection-retry warnings and then quietly succeed anyway. A genuine dependency error is still shown in full. Applies to the Mac, Linux and Windows launchers.
+- **A launcher that cannot reach the index no longer stops the app when the dependencies are already installed** — it says what happened and carries on.
+- **Locally-run models are no longer all badged "Unknown"** — Ollama and LM Studio write model names with a colon ("gemma4:12b") while the tier list used hyphens, so every local model fell through to unclassified and every local report carried a "re-run with a better model" disclaimer.
+- **Small model variants are no longer badged as their large namesakes** — a 14B DeepSeek R1 distillation was inheriting the 671B model's Frontier rating.
+
+### Improvements
+
+- **The behaviour pill now reports a count instead of a risk level** — it showed Quark-Engine's own "High Risk" label, which is a mechanical weight sum with no idea what the app is, so ordinary apps triggered it routinely. Worse, that label also suppressed the "Safe to use" badge, meaning a clean app almost never earned one. The pill now states how many behaviour patterns matched and leaves the judgement to the report.
+- **A new default local model** — `gemma4:12b`, at 7.6 GB rather than the 20 GB code-completion model it replaces. A general-purpose model reads scan evidence and admits what it doesn't recognise better than a coding model does. The README's hardware recommendations have been refreshed to match. Existing configurations are unaffected.
+- **Three smaller prompt corrections** — a "Privacy Concerns" section is no longer requested when the scan found no permissions or trackers to discuss; the malware-packer rule no longer names specific packers, which invited the model to report one the scan never found; and the machine-read verdict is now required to agree with the verdict written in the summary.
+
+---
+
 ## [v1.12.0] — 2026-07-22
 
 Offline-focused release. Running APK-JTM fully offline against a small local model produced

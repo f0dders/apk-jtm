@@ -99,6 +99,13 @@ if !PY_MINOR! geq 14 (
   echo.
 )
 
+:: ── Check internet connectivity ────────────────────────────────────────────────
+:: Checked once, up front, so an offline launch skips the dependency step
+:: deliberately rather than discovering it five retries at a time.
+set ONLINE=1
+curl -fsS --max-time 4 -o nul https://pypi.org/simple/ 2>nul
+if !errorlevel! neq 0 set ONLINE=0
+
 :: ── Virtual environment ───────────────────────────────────────────────────────
 :: Detect venv Python version and rebuild if changed
 set VENV_PY=
@@ -126,42 +133,76 @@ if not exist ".venv\" (
 call .venv\Scripts\activate.bat
 
 :: ── Core dependencies ─────────────────────────────────────────────────────────
-echo   Checking dependencies...
-pip install -r requirements.txt --upgrade -q
-if !errorlevel! neq 0 (
-  echo.
-  echo   [ERROR] Failed to install dependencies.
-  echo   Check your internet connection and try again.
-  pause
-  exit /b 1
-)
-echo   [OK] Dependencies ready
-
-:: ── APKiD (optional) ──────────────────────────────────────────────────────────
-pip install apkid -q >nul 2>&1
-if !errorlevel! equ 0 (
-  echo   [OK] APKiD ready (packer analysis enabled)
+if !ONLINE! equ 0 (
+  echo   No internet - skipping dependency updates, using what's already installed.
+  python -c "import fastapi, uvicorn" >nul 2>&1
+  if !errorlevel! neq 0 (
+    echo.
+    echo   [ERROR] Dependencies are not installed, and there is no internet to fetch them.
+    echo   The first run needs a connection once. After that the app runs offline.
+    echo   For a machine that will never have one, use the offline install bundle
+    echo   ^(see docs/OFFLINE.md^).
+    echo.
+    pause
+    exit /b 1
+  )
+  echo   [OK] Dependencies ready ^(offline^)
 ) else (
-  echo   [NOTE] APKiD unavailable on Python %PY_FULL% -- packer analysis skipped
-  if !PY_MINOR! geq 14 (
-    echo          To enable: install Python 3.12 and re-run this launcher
-  )
-)
-
-:: ── Quark-Engine (pure Python -- no native build tools needed) ────────────────
-pip install quark-engine -q >nul 2>&1
-if !errorlevel! equ 0 (
-  if not exist "%USERPROFILE%\.quark-engine\quark-rules\rules" (
-    echo   Fetching Quark-Engine rule database ^(one-time, needs internet^)...
-    freshquark >nul 2>&1
-  )
-  if exist "%USERPROFILE%\.quark-engine\quark-rules\rules" (
-    echo   [OK] Quark-Engine ready ^(behavioural pattern analysis enabled^)
+  echo   Checking dependencies...
+  pip install -r requirements.txt --upgrade --retries 2 --timeout 15 -q >"%TEMP%\apkjtm-pip.log" 2>&1
+  if !errorlevel! neq 0 (
+    python -c "import fastapi, uvicorn" >nul 2>&1
+    if !errorlevel! equ 0 (
+      type "%TEMP%\apkjtm-pip.log"
+      echo   [NOTE] Could not update dependencies ^(see above^) - continuing with the installed versions.
+    ) else (
+      echo.
+      echo   [ERROR] Failed to install dependencies, and none are installed to fall back on.
+      type "%TEMP%\apkjtm-pip.log"
+      del "%TEMP%\apkjtm-pip.log" >nul 2>&1
+      pause
+      exit /b 1
+    )
   ) else (
-    echo   [NOTE] Quark-Engine rule database unavailable ^(no internet on first run?^) -- run 'freshquark' manually later
+    echo   [OK] Dependencies ready
   )
-) else (
-  echo   [NOTE] Quark-Engine install failed -- behavioural analysis skipped
+  del "%TEMP%\apkjtm-pip.log" >nul 2>&1
+
+  :: ── APKiD (optional) ────────────────────────────────────────────────────────
+  pip install apkid -q --retries 2 --timeout 15 >nul 2>&1
+  if !errorlevel! equ 0 (
+    echo   [OK] APKiD ready ^(packer analysis enabled^)
+  ) else (
+    echo   [NOTE] APKiD unavailable on Python %PY_FULL% -- packer analysis skipped
+    if !PY_MINOR! geq 14 (
+      echo          To enable: install Python 3.12 and re-run this launcher
+    )
+  )
+
+  :: ── Quark-Engine (pure Python -- no native build tools needed) ──────────────
+  pip install quark-engine -q --retries 2 --timeout 15 >nul 2>&1
+  if !errorlevel! equ 0 (
+    if not exist "%USERPROFILE%\.quark-engine\quark-rules\rules" (
+      echo   Fetching Quark-Engine rule database ^(one-time, needs internet^)...
+      freshquark >nul 2>&1
+    )
+    if exist "%USERPROFILE%\.quark-engine\quark-rules\rules" (
+      echo   [OK] Quark-Engine ready ^(behavioural pattern analysis enabled^)
+    ) else (
+      echo   [NOTE] Quark-Engine rule database unavailable - run 'freshquark' manually later
+    )
+  ) else (
+    echo   [NOTE] Quark-Engine install failed -- behavioural analysis skipped
+  )
+)
+
+:: Optional tools already installed from an earlier online run still work
+:: offline, so report them rather than staying silent about them.
+if !ONLINE! equ 0 (
+  where apkid >nul 2>&1 && echo   [OK] APKiD ready ^(packer analysis enabled^)
+  if exist "%USERPROFILE%\.quark-engine\quark-rules\rules" (
+    where quark >nul 2>&1 && echo   [OK] Quark-Engine ready ^(behavioural pattern analysis enabled^)
+  )
 )
 echo.
 
@@ -178,10 +219,40 @@ if !errorlevel! neq 0 (
 ) else (
   curl -s --max-time 3 http://localhost:8000 >nul 2>&1
   if !errorlevel! neq 0 (
-    echo   Starting MobSF via Docker...
-    if not exist "%USERPROFILE%\.mobsf" mkdir "%USERPROFILE%\.mobsf"
-    docker start mobsf >nul 2>&1 || docker run -d --name mobsf -p 8000:8000 -v "%USERPROFILE%\.mobsf:/home/mobsf/.MobSF" opensecurity/mobile-security-framework-mobsf >nul 2>&1
-    echo   [OK] MobSF starting at http://localhost:8000
+    :: docker run on a missing image triggers a pull, which offline means a
+    :: long wait and a failure. Only reach for it when the image is already
+    :: local or there is a connection to fetch it with.
+    docker image inspect opensecurity/mobile-security-framework-mobsf >nul 2>&1
+    if !errorlevel! equ 0 (
+      set IMAGE_LOCAL=1
+    ) else (
+      set IMAGE_LOCAL=0
+    )
+
+    if !IMAGE_LOCAL! equ 1 (
+      set TRY_RUN=1
+    ) else if !ONLINE! equ 1 (
+      set TRY_RUN=1
+    ) else (
+      set TRY_RUN=0
+    )
+
+    if !TRY_RUN! equ 1 (
+      echo   Starting MobSF via Docker...
+      if not exist "%USERPROFILE%\.mobsf" mkdir "%USERPROFILE%\.mobsf"
+      docker run -d --name mobsf -p 8000:8000 -v "%USERPROFILE%\.mobsf:/home/mobsf/.MobSF" opensecurity/mobile-security-framework-mobsf >nul 2>&1
+      if !errorlevel! neq 0 docker start mobsf >nul 2>&1
+      echo   [OK] MobSF starting at http://localhost:8000
+    ) else (
+      docker start mobsf >nul 2>&1
+      if !errorlevel! equ 0 (
+        echo   [OK] MobSF starting at http://localhost:8000
+      ) else (
+        echo   [NOTE] MobSF isn't running and its image isn't downloaded yet -
+        echo          scanning needs a connection once to fetch it. You can still load
+        echo          an existing MobSF JSON report offline.
+      )
+    )
   ) else (
     echo   [OK] MobSF already running
   )

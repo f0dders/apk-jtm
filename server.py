@@ -255,7 +255,7 @@ async def get_config():
         "mobsf_key_set": bool(env.get("MOBSF_API_KEY")),
         "provider": env.get("PROVIDER", "ollama"),
         "ollama_url": env.get("OLLAMA_URL", "http://localhost:11434"),
-        "ollama_model": env.get("OLLAMA_MODEL", "qwen2.5-coder:32b"),
+        "ollama_model": env.get("OLLAMA_MODEL", "gemma4:12b"),
         "lmstudio_url": env.get("LM_STUDIO_URL", "http://localhost:1234"),
         "lmstudio_model": env.get("LM_STUDIO_MODEL", ""),
         "claude_key_set": bool(env.get("ANTHROPIC_API_KEY")),

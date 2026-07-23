@@ -133,7 +133,7 @@ const PROVIDERS = [
 ];
 
 const DEFAULT_MODELS = {
-  ollama:      'qwen2.5-coder:32b',
+  ollama:      'gemma4:12b',
   lmstudio:    '',
   claude:      'claude-sonnet-5',
   openai:      'gpt-5.5',
@@ -225,8 +225,8 @@ function buildProviderConfigFields(prefix, p, cfg) {
       </div>
       <div class="field">
         <label>Model</label>
-        <input id="${prefix}-ollama-model" type="text" value="${cfg.ollama_model || DEFAULT_MODELS.ollama}" placeholder="qwen2.5-coder:32b">
-        <div class="field-hint">Install with: <code>ollama pull qwen2.5-coder:32b</code></div>
+        <input id="${prefix}-ollama-model" type="text" value="${cfg.ollama_model || DEFAULT_MODELS.ollama}" placeholder="gemma4:12b">
+        <div class="field-hint">Install with: <code>ollama pull gemma4:12b</code></div>
       </div>
     `;
   } else if (p === 'lmstudio') {
@@ -939,21 +939,26 @@ function reportCard(r, appNameOverride, isOlder = false) {
     // Clean APKiD result needs no badge — covered by the single green verdict pill below
   }
 
-  // Quark-Engine pill — behavioural threat level is mechanical and noisy
-  // (even legitimate apps often land on Moderate/High), so this is framed
-  // as neutral info, never an alarm colour — the AI report gives context.
+  // Quark-Engine pill — a count of matched API-call patterns, not Quark's own
+  // threat level. That level is a mechanical weight sum with no idea what the
+  // app is, so legitimate apps routinely land on Moderate or High and the pill
+  // read as an alarm it was never entitled to raise. The count states what was
+  // actually found and leaves the judgement to the report.
   let quarkEl = '';
-  if (r.quark_available && r.quark_threat_level && r.quark_threat_level !== 'Low Risk') {
-    quarkEl = `<span class="card-quark card-quark-info" title="Quark-Engine matched ${r.quark_matched_count || 0} behaviour pattern(s) — see report for context">🧬 Behaviour: ${r.quark_threat_level}</span>`;
+  if (r.quark_available && r.quark_matched_count > 0) {
+    const count = r.quark_matched_count;
+    const plural = count === 1 ? '' : 's';
+    const tip = `Quark-Engine matched ${count} behaviour pattern${plural} — mechanical API-call matches, not a verdict. The report explains them in context.`;
+    quarkEl = `<span class="card-quark card-quark-info" title="${tip}">🧬 ${count} behaviour pattern${plural}</span>`;
   }
 
-  // Consolidated status: single green pill when everything is clear,
-  // otherwise show verdict + any APKiD/Quark warnings separately
+  // Consolidated status: a single green pill when the verdict and APKiD are
+  // clear. Quark deliberately does not gate it — letting a mechanical pattern
+  // count veto "Safe to use" meant a clean app almost never earned one.
   const apkidAllClear = r.apkid_available && !r.apkid_packer && !r.apkid_anti_vm && !r.apkid_malware_packer;
-  const quarkAllClear = !r.quark_available || !r.quark_threat_level || r.quark_threat_level === 'Low Risk';
-  const allClear = vKey === 'LOW' && (apkidAllClear || !r.apkid_available) && quarkAllClear;
+  const allClear = vKey === 'LOW' && (apkidAllClear || !r.apkid_available);
   const statusEl = allClear
-    ? `<span class="card-verdict card-verdict-safe">✓ Safe to use</span>`
+    ? `<span class="card-verdict card-verdict-safe">✓ Safe to use</span>${quarkEl}`
     : `${verdictEl}${apkidEl}${quarkEl}`;
 
   // Older runs: collapsed single-row view

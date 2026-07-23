@@ -4,6 +4,14 @@ All notable changes are documented here. Versions follow [Semantic Versioning](h
 
 ---
 
+## [v1.13.1] — 2026-07-23
+
+### Fixes
+
+- **A reasoning model's thinking no longer ends up in the report** — models that reason before answering (most current local models do) emit that pass as `<think>…</think>`. Ollama hands it back separately so it was never seen, but LM Studio leaves it inline, where nothing downstream could tell it from report prose: it was saved into the report, and the HTML sanitiser then removed the tags while keeping their text, so the reader got an unlabelled monologue with no visible boundary between the model working out and the model concluding. It is now stripped before the report is parsed or saved, so a verdict the model tried on mid-reasoning can no longer compete with the one it settled on, and a report cut off mid-thought is correctly reported as incomplete. Affects LM Studio in particular, but applies to every provider.
+
+---
+
 ## [v1.13.0] — 2026-07-23
 
 Three things made the app look broken when it wasn't. An app the AI didn't recognise — the

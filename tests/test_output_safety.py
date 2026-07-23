@@ -63,6 +63,60 @@ def test_case_and_spacing_variations_still_parse():
     assert verdict == "HIGH"
 
 
+# ── Reasoning blocks ────────────────────────────────────────────────────────
+# Ollama returns a model's thinking pass in its own field, but the OpenAI chat
+# format has none, so LM Studio leaves it inline in the content. Nothing
+# downstream can tell it from report prose, and the HTML sanitiser drops the
+# tags while keeping their text — so the reader gets an unlabelled monologue.
+
+def test_reasoning_block_is_removed_from_the_report():
+    raw = "<think>Let me work through the permissions.</think>\n" + COMPLETE
+    assert server._strip_reasoning(raw) == COMPLETE.strip()
+
+
+def test_a_verdict_tried_on_mid_reasoning_cannot_reach_the_parser():
+    """The strip runs before parsing for this reason: the model talking itself
+    through 'VERDICT: LOW' must not compete with the verdict it settled on."""
+    raw = "<think>Maybe VERDICT: LOW fits.</think>\n" + COMPLETE
+    verdict, _, _ = server._parse_verdict_tags(server._strip_reasoning(raw))
+    assert verdict == "MEDIUM"
+
+
+def test_report_between_two_reasoning_blocks_survives():
+    """A greedy match would swallow the report sitting between them."""
+    raw = "<think>first</think>\n## Red Flags\nNone.\n<think>second</think>\n## Verdict\nInstall."
+    stripped = server._strip_reasoning(raw)
+    assert "## Red Flags" in stripped and "## Verdict" in stripped
+    assert "first" not in stripped and "second" not in stripped
+
+
+def test_an_unclosed_reasoning_block_leaves_nothing_to_report():
+    """A stream cut off mid-thought produced no report at all, and must be
+    reported as incomplete rather than as a model that declined to rate."""
+    _, _, truncated = server._parse_verdict_tags(
+        server._strip_reasoning("<think>still working when the stream died")
+    )
+    assert truncated is True
+
+
+def test_a_closing_tag_without_an_opener_still_strips():
+    """Some servers consume the opening tag and pass the closing one through."""
+    raw = "working through it</think>\n" + COMPLETE
+    assert server._strip_reasoning(raw) == COMPLETE.strip()
+
+
+def test_tag_spelling_and_spacing_variations_are_caught():
+    for open_tag, close_tag in (("<thinking>", "</thinking>"),
+                                ("<reasoning>", "</reasoning>"),
+                                ("< THINK >", "</ Think >")):
+        raw = f"{open_tag}noise{close_tag}\n" + COMPLETE
+        assert "noise" not in server._strip_reasoning(raw), open_tag
+
+
+def test_a_report_without_reasoning_is_untouched():
+    assert server._strip_reasoning(COMPLETE) == COMPLETE.strip()
+
+
 # ── Rendered HTML ───────────────────────────────────────────────────────────
 
 def test_script_tags_are_dropped_with_their_contents():

@@ -17,6 +17,7 @@ import asyncio
 import hashlib
 import json
 import os
+import re
 import shutil
 import time
 import uuid
@@ -80,6 +81,42 @@ MAX_USER_CONTEXT = 2000
 # the limit has to fail loudly rather than quietly return fiction.
 CONTEXT_SAFETY_MARGIN = 0.8
 
+# Reasoning models emit a thinking pass before the report itself. Ollama's
+# native API hands that back in a separate `message.thinking` field, so the
+# Ollama provider never sees it — but the OpenAI chat format has no field for
+# it, and LM Studio's server therefore leaves it inline in the content as
+# <think>…</think>. Nothing downstream can tell that apart from report prose:
+# it streams into the saved report, and the HTML sanitiser then drops the tags
+# while keeping their text, so the reader gets an unlabelled monologue with no
+# visible boundary between the model working out and the model concluding.
+#
+# Matched non-greedily so two separate blocks don't swallow the report between
+# them, and with an optional closing tag so a stream cut off mid-thought — or a
+# server that strips the opener but not the closer — is still handled.
+_REASONING_BLOCK = re.compile(
+    r"<\s*(think|thinking|reasoning)\s*>.*?(?:<\s*/\s*\1\s*>|\Z)",
+    re.IGNORECASE | re.DOTALL,
+)
+_ORPHAN_REASONING_CLOSE = re.compile(
+    r"\A.*?<\s*/\s*(?:think|thinking|reasoning)\s*>",
+    re.IGNORECASE | re.DOTALL,
+)
+
+
+def _strip_reasoning(report: str) -> str:
+    """Remove a model's inline thinking pass from an assembled report.
+
+    Applied before the verdict is parsed, not after: a verdict the model tries
+    on mid-reasoning must not reach the parser, and the truncation heuristic
+    has to measure the actual report rather than the monologue in front of it.
+    """
+    stripped = _REASONING_BLOCK.sub("", report)
+    if stripped == report:
+        # No opening tag, but a closing one means the opener was consumed
+        # upstream and everything before the close is still reasoning.
+        stripped = _ORPHAN_REASONING_CLOSE.sub("", report, count=1)
+    return stripped.strip()
+
 
 def _parse_verdict_tags(report: str) -> tuple[str | None, str | None, bool]:
     """Pull the machine-readable VERDICT/SUMMARY trailer out of an AI report.
@@ -96,8 +133,6 @@ def _parse_verdict_tags(report: str) -> tuple[str | None, str | None, bool]:
     early, so an incomplete report is distinguished here rather than quietly
     presented as an unrated one.
     """
-    import re
-
     verdicts = re.findall(
         r'^VERDICT:\s*(LOW|MEDIUM|HIGH|CRITICAL)\s*$',
         report, re.IGNORECASE | re.MULTILINE,
@@ -824,15 +859,14 @@ async def run_scan(
             ai_chunks.append(value)
             first_chunk_received = True
 
-        import re as _re
-        full_report_raw = "".join(ai_chunks)
+        full_report_raw = _strip_reasoning("".join(ai_chunks))
 
         ai_verdict, ai_summary, looks_truncated = _parse_verdict_tags(full_report_raw)
 
         # Strip both tag lines from the rendered report
-        full_report = _re.sub(
+        full_report = re.sub(
             r'\n*^(VERDICT:\s*(LOW|MEDIUM|HIGH|CRITICAL)|SUMMARY:\s*.+)\s*$\n*',
-            '', full_report_raw, flags=_re.IGNORECASE | _re.MULTILINE
+            '', full_report_raw, flags=re.IGNORECASE | re.MULTILINE
         ).strip()
 
         import reporter

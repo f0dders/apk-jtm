@@ -227,7 +227,7 @@ Quark-Engine is pure Python — no native build tools required, unlike APKiD. It
 
 **Re-analyse** — the ⟳ button on any saved report re-runs AI analysis with a different model, without re-uploading the APK.
 
-**Compare versions** — when an app has 2+ saved analyses, a "⇄ Compare" button appears on its group header. Pick any two runs to see what changed: permissions, trackers, domains, secrets, code issues, APKiD packer flags, and Quark-Engine threat-level changes — added/removed, no re-scanning needed. Reports saved before this feature was added show "Not available" for detailed diffs until re-run.
+**Compare versions** — when an app has 2+ saved analyses, a "⇄ Compare" button appears on its group header. Pick any two runs to see what changed: permissions, trackers, domains, secrets, code issues, APKiD packer flags, and the number of Quark-Engine behaviour patterns matched — added/removed, no re-scanning needed. Reports saved before this feature was added show "Not available" for detailed diffs until re-run.
 
 ---
 
@@ -324,7 +324,7 @@ All three are GPL-licensed, which lines up naturally with APK-JTM's own [GPL v3 
 | **AI provider SDKs** | [Anthropic](https://github.com/anthropics/anthropic-sdk-python) (MIT), [OpenAI](https://github.com/openai/openai-python) (Apache-2.0), [Google Gen AI](https://github.com/googleapis/python-genai) (Apache-2.0), [Ollama](https://github.com/ollama/ollama-python) (MIT) — the same OpenAI-compatible client also drives Groq, Mistral, OpenRouter, and LM Studio |
 | **Utilities** | [Requests](https://github.com/psf/requests) (Apache-2.0), [Rich](https://github.com/Textualize/rich) (MIT), [python-dotenv](https://github.com/theskumar/python-dotenv) (BSD-3-Clause), [Python-Markdown](https://github.com/Python-Markdown/markdown) (BSD-3-Clause), [aiofiles](https://github.com/Tinche/aiofiles) (Apache-2.0), [python-multipart](https://github.com/Kludex/python-multipart) (Apache-2.0) |
 
-See [requirements.txt](requirements.txt) for the complete, version-pinned dependency list.
+See [requirements.txt](requirements.txt) for the complete dependency list and the supported version ranges.
 
 ---
 
@@ -332,4 +332,4 @@ See [requirements.txt](requirements.txt) for the complete, version-pinned depend
 
 Copyright (C) 2026 f0dders
 
-Licensed under the [GNU General Public License v3.0](LICENSE). Free to use, modify, and distribute — any derivative work must also be open source under the same licence. Commercial use requires separate written permission from the author.
+Licensed under the [GNU General Public License v3.0](LICENSE). Free to use, modify, and distribute — any derivative work must also be open source under the same licence.

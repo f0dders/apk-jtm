@@ -4,6 +4,22 @@ All notable changes are documented here. Versions follow [Semantic Versioning](h
 
 ---
 
+## [Unreleased]
+
+### Fixes
+
+- **The Settings page no longer offers outdated models** — it kept its own list of default models, separate from the one scans actually use, and the two had drifted apart. A new install was offered `gpt-4o`, `gemini-1.5-pro`, and Groq's retired `llama-3.3-70b-versatile`, and saving the page wrote them into your config. It now shows the same default a scan would use. Existing configurations are unaffected.
+- **Ollama falls back to the recommended model** — with no model configured, Ollama scans used `qwen2.5-coder:32b`, a 20 GB coding model the README advises against. They now use `gemma4:12b`, matching the Settings page.
+- **`.env.example` lists current models** — it still named the models from before v1.13.
+
+### Improvements
+
+- **Dependency versions are now bounded** — the minimum versions dated from 2024, and nothing stopped a fresh install from pulling in an untested major release of an AI provider's library. Each dependency now requires at least the version the test suite last passed against, and the fast-moving ones are capped below their next major version. The launcher upgrades existing installs automatically.
+- **Compare now shows the number of behaviour patterns matched** — it still compared Quark-Engine's own threat level, the mechanical label the report card stopped showing in v1.13. A change in that label alone is no longer reported as a behavioural change.
+- **The test suite now runs on Python 3.10 to 3.13** — it previously ran on 3.12 only, although 3.10 is the documented minimum.
+
+---
+
 ## [v1.13.1] — 2026-07-23
 
 ### Fixes

@@ -1,4 +1,4 @@
-"""
+r"""
 User data directory resolution — platform standard locations.
 
   macOS   ~/Library/Application Support/APK-JTM/

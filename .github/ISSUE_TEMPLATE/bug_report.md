@@ -22,7 +22,7 @@ What actually happened. Paste any error messages here.
 - **OS:** (Mac / Windows / Linux + version)
 - **Python version:** (run `python3 --version`)
 - **AI provider:** (Ollama / Claude / OpenAI / etc.)
-- **Model:** (e.g. `gemma3:27b`, `claude-sonnet-4-6`)
+- **Model:** (e.g. `gemma4:12b`, `claude-sonnet-5`)
 - **APK size (approx):** 
 
 ## Launcher output

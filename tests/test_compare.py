@@ -55,26 +55,28 @@ def test_diff_apkid_unavailable_if_either_side_lacks_apkid():
     assert result == {"available": False, "changes": []}
 
 
-def test_diff_quark_flags_threat_level_change():
-    a = {"quark_available": True, "quark_threat_level": "Low Risk"}
-    b = {"quark_available": True, "quark_threat_level": "High Risk"}
+def test_diff_quark_flags_matched_count_change():
+    a = {"quark_available": True, "quark_matched_count": 3}
+    b = {"quark_available": True, "quark_matched_count": 7}
     result = server._diff_quark(a, b)
     assert result == {
-        "available": True, "threat_level_changed": True,
-        "older_level": "Low Risk", "newer_level": "High Risk",
+        "available": True, "count_changed": True,
+        "older_count": 3, "newer_count": 7,
     }
 
 
-def test_diff_quark_no_change():
-    a = {"quark_available": True, "quark_threat_level": "Low Risk"}
-    b = {"quark_available": True, "quark_threat_level": "Low Risk"}
+def test_diff_quark_ignores_threat_level_when_count_is_unchanged():
+    # Quark's threat level is a mechanical score the app no longer surfaces;
+    # a change in it alone must not be reported as a behavioural change.
+    a = {"quark_available": True, "quark_matched_count": 4, "quark_threat_level": "Low Risk"}
+    b = {"quark_available": True, "quark_matched_count": 4, "quark_threat_level": "High Risk"}
     result = server._diff_quark(a, b)
-    assert result["threat_level_changed"] is False
+    assert result["count_changed"] is False
 
 
 def test_diff_quark_unavailable_if_either_side_lacks_quark():
     a = {"quark_available": False}
-    b = {"quark_available": True, "quark_threat_level": "High Risk"}
+    b = {"quark_available": True, "quark_matched_count": 5}
     result = server._diff_quark(a, b)
     assert result["available"] is False
 

@@ -1,23 +1,27 @@
+# Minimums are the versions the test suite last passed against; upper caps
+# stop a fresh install pulling in an untested major version. Raise both after
+# testing a new release.
+
 # Web server
-fastapi>=0.111.0
-uvicorn>=0.30.0
-sse-starlette>=2.1.0
-python-multipart>=0.0.9
-aiofiles>=23.2.1
+fastapi>=0.142.0,<1
+uvicorn>=0.54.0,<1
+sse-starlette>=3.5.0,<4
+python-multipart>=0.0.32
+aiofiles>=25.1.0
 
 # Core
-requests>=2.31.0
-rich>=13.7.0
-python-dotenv>=1.0.0
-markdown>=3.6
+requests>=2.34.2,<3
+rich>=15.0.0
+python-dotenv>=1.2.3,<2
+markdown>=3.10.2,<4
 
 # Local providers
-ollama>=0.1.7
+ollama>=0.6.3,<1
 
 # Cloud providers
-openai>=1.30.0        # also covers Groq, Mistral, OpenRouter, LM Studio (all OpenAI-compatible)
-anthropic>=0.28.0
-google-genai>=1.0.0
+openai>=3.22.0,<4    # also covers Groq, Mistral, OpenRouter, LM Studio (all OpenAI-compatible)
+anthropic>=1.9.0,<2
+google-genai>=2.25.0,<3
 
 # Supplemental analysis tools
 # apkid is installed separately by the launcher (optional — requires native build tools;

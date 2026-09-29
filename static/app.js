@@ -129,7 +129,7 @@ const PROVIDERS = [
   { id: 'gemini',     name: 'Gemini',      type: 'cloud',   flag: '🇺🇸', location: 'USA',              desc: 'Google Gemini 2.5 and above.' },
   { id: 'groq',       name: 'Groq',        type: 'cloud',   flag: '🇺🇸', location: 'USA',              desc: 'Ultra-fast inference. Generous free tier.' },
   { id: 'mistral',    name: 'Mistral',     type: 'cloud',   flag: '🇪🇺', location: 'EU (France)',       desc: 'European AI. Strong code & reasoning models.' },
-  { id: 'openrouter', name: 'OpenRouter',  type: 'cloud',   flag: '🇺🇸', location: 'USA (multi-model)', desc: 'One key, 100+ models — Claude, GPT-4, Llama & more.' },
+  { id: 'openrouter', name: 'OpenRouter',  type: 'cloud',   flag: '🇺🇸', location: 'USA (multi-model)', desc: 'One key, 100+ models — Claude, GPT, Gemini, Llama & more.' },
 ];
 
 const DEFAULT_MODELS = {
@@ -1087,10 +1087,10 @@ function renderCompareResult(data) {
   let quarkEl = '';
   if (!data.quark.available) {
     quarkEl = `<div class="compare-section"><div class="compare-section-title">Behavioural analysis (Quark-Engine)</div><div class="compare-nochange">Not available for one or both reports.</div></div>`;
-  } else if (!data.quark.threat_level_changed) {
-    quarkEl = `<div class="compare-section"><div class="compare-section-title">Behavioural analysis (Quark-Engine)</div><div class="compare-nochange">No change — still ${data.quark.newer_level}</div></div>`;
+  } else if (!data.quark.count_changed) {
+    quarkEl = `<div class="compare-section"><div class="compare-section-title">Behavioural analysis (Quark-Engine)</div><div class="compare-nochange">No change — ${data.quark.newer_count} behaviour pattern${data.quark.newer_count === 1 ? '' : 's'} matched</div></div>`;
   } else {
-    quarkEl = `<div class="compare-section"><div class="compare-section-title">Behavioural analysis (Quark-Engine)</div><ul class="compare-diff-list"><li class="diff-warn">⚠ Threat level changed: ${data.quark.older_level} → ${data.quark.newer_level}</li></ul></div>`;
+    quarkEl = `<div class="compare-section"><div class="compare-section-title">Behavioural analysis (Quark-Engine)</div><ul class="compare-diff-list"><li class="diff-warn">⚠ Behaviour patterns matched: ${data.quark.older_count} → ${data.quark.newer_count}</li></ul></div>`;
   }
 
   return `

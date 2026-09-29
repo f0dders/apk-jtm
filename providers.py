@@ -117,6 +117,7 @@ def _iter_completion(stream) -> Iterator[str]:
 
 class OllamaProvider:
     name = "ollama"
+    DEFAULT_MODEL = "gemma4:12b"
 
     def __init__(self, model: str, base_url: str = "http://localhost:11434",
                  num_ctx: int = 32768, seed: int | None = None):
@@ -354,7 +355,7 @@ def build_provider(
 
     if p == "ollama":
         return OllamaProvider(
-            model=model or env.get("OLLAMA_MODEL", "qwen2.5-coder:32b"),
+            model=model or env.get("OLLAMA_MODEL", OllamaProvider.DEFAULT_MODEL),
             base_url=env.get("OLLAMA_URL", "http://localhost:11434"),
             num_ctx=int(env.get("OLLAMA_NUM_CTX", 32768)),
             seed=seed,

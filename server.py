@@ -31,6 +31,10 @@ from fastapi.staticfiles import StaticFiles
 from sse_starlette.sse import EventSourceResponse
 
 from paths import DATA_DIR, ENV_PATH, REPORTS_DIR
+from providers import (
+    ClaudeProvider, GeminiProvider, GroqProvider, MistralProvider,
+    OllamaProvider, OpenAIProvider, OpenRouterProvider,
+)
 from version import VERSION
 
 # Ensure data directories exist
@@ -290,21 +294,21 @@ async def get_config():
         "mobsf_key_set": bool(env.get("MOBSF_API_KEY")),
         "provider": env.get("PROVIDER", "ollama"),
         "ollama_url": env.get("OLLAMA_URL", "http://localhost:11434"),
-        "ollama_model": env.get("OLLAMA_MODEL", "gemma4:12b"),
+        "ollama_model": env.get("OLLAMA_MODEL", OllamaProvider.DEFAULT_MODEL),
         "lmstudio_url": env.get("LM_STUDIO_URL", "http://localhost:1234"),
         "lmstudio_model": env.get("LM_STUDIO_MODEL", ""),
         "claude_key_set": bool(env.get("ANTHROPIC_API_KEY")),
-        "claude_model": env.get("CLAUDE_MODEL", "claude-sonnet-4-6"),
+        "claude_model": env.get("CLAUDE_MODEL", ClaudeProvider.DEFAULT_MODEL),
         "openai_key_set": bool(env.get("OPENAI_API_KEY")),
-        "openai_model": env.get("OPENAI_MODEL", "gpt-4o"),
+        "openai_model": env.get("OPENAI_MODEL", OpenAIProvider.DEFAULT_MODEL),
         "gemini_key_set": bool(env.get("GEMINI_API_KEY")),
-        "gemini_model": env.get("GEMINI_MODEL", "gemini-1.5-pro"),
+        "gemini_model": env.get("GEMINI_MODEL", GeminiProvider.DEFAULT_MODEL),
         "groq_key_set": bool(env.get("GROQ_API_KEY")),
-        "groq_model": env.get("GROQ_MODEL", "llama-3.3-70b-versatile"),
+        "groq_model": env.get("GROQ_MODEL", GroqProvider.DEFAULT_MODEL),
         "mistral_key_set": bool(env.get("MISTRAL_API_KEY")),
-        "mistral_model": env.get("MISTRAL_MODEL", "mistral-large-latest"),
+        "mistral_model": env.get("MISTRAL_MODEL", MistralProvider.DEFAULT_MODEL),
         "openrouter_key_set": bool(env.get("OPENROUTER_API_KEY")),
-        "openrouter_model": env.get("OPENROUTER_MODEL", "anthropic/claude-sonnet-4-6"),
+        "openrouter_model": env.get("OPENROUTER_MODEL", OpenRouterProvider.DEFAULT_MODEL),
         "report_language": env.get("REPORT_LANGUAGE", "British English"),
     }
 
@@ -419,14 +423,17 @@ def _diff_apkid(a: dict, b: dict) -> dict:
 
 
 def _diff_quark(a: dict, b: dict) -> dict:
+    # Compares the number of matched behaviours, not Quark's own threat level:
+    # that label is a mechanical weight sum the report card stopped showing in
+    # v1.13, and a change in it says nothing the report doesn't say better.
     if not (a.get("quark_available") and b.get("quark_available")):
-        return {"available": False, "threat_level_changed": False, "older_level": "", "newer_level": ""}
-    level_a, level_b = a.get("quark_threat_level", ""), b.get("quark_threat_level", "")
+        return {"available": False, "count_changed": False, "older_count": 0, "newer_count": 0}
+    count_a, count_b = a.get("quark_matched_count", 0), b.get("quark_matched_count", 0)
     return {
         "available": True,
-        "threat_level_changed": level_a != level_b,
-        "older_level": level_a,
-        "newer_level": level_b,
+        "count_changed": count_a != count_b,
+        "older_count": count_a,
+        "newer_count": count_b,
     }
 
 

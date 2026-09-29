@@ -125,3 +125,18 @@ def test_exported_component_counts_only_true_strings():
     assert counts["services"] == 1
     assert counts["receivers"] == 0
     assert counts["providers"] == 0
+
+
+def test_code_issues_list_high_severity_before_warnings():
+    """MobSF lists findings in rule order; the caps downstream must drop
+    warnings first, so high-severity issues have to lead."""
+    def finding(severity):
+        return {"metadata": {"severity": severity, "description": "d"}, "files": {}}
+
+    report = {"code_analysis": {"findings": {
+        "warn_a": finding("warning"),
+        "warn_b": finding("warning"),
+        "high_a": finding("high"),
+    }}}
+    issues = extractor._extract_code_issues(report)
+    assert [i["severity"] for i in issues] == ["high", "warning", "warning"]

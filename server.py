@@ -155,6 +155,37 @@ def _parse_verdict_tags(report: str) -> tuple[str | None, str | None, bool]:
     return verdict, summary, truncated
 
 
+_VERDICT_LEVELS = ("LOW", "MEDIUM", "HIGH", "CRITICAL")
+_BOLD_LEVEL = re.compile(r"\*\*\s*(LOW|MEDIUM|HIGH|CRITICAL)\s*\*\*", re.IGNORECASE)
+
+
+def _summary_verdict(report: str) -> str | None:
+    """Find the bold verdict the model gave in its Executive Summary.
+
+    The prompt asks for it as a standalone bold level (**HIGH**), and that is
+    the first one in the report — finding badges carry an emoji inside the bold
+    run, so they never match. Returns None when there is none to compare.
+    """
+    match = _BOLD_LEVEL.search(report)
+    return match.group(1).upper() if match else None
+
+
+def _apply_verdict_floor(verdict: str | None, apkid: dict) -> tuple[str | None, str | None]:
+    """Enforce the prompt's mandatory escalation in code.
+
+    The prompt tells the model that a known malware packer means HIGH or
+    CRITICAL, but small models do not reliably obey it. Returns
+    (verdict, raised_from): raised_from is the model's own level when it was
+    raised, else None. A missing verdict is left missing — the report is
+    already flagged as incomplete, and inventing a level would hide that.
+    """
+    if verdict is None or not apkid.get("known_malware_packer"):
+        return verdict, None
+    if _VERDICT_LEVELS.index(verdict) >= _VERDICT_LEVELS.index("HIGH"):
+        return verdict, None
+    return "HIGH", verdict
+
+
 def _prompt_fingerprint(prompt: str) -> str:
     """Hash the assembled prompt so a re-run can prove its input was identical.
 
@@ -876,6 +907,18 @@ async def run_scan(
             '', full_report_raw, flags=re.IGNORECASE | re.MULTILINE
         ).strip()
 
+        # The Executive Summary and the VERDICT line are read by different
+        # people, so a disagreement between them is shown rather than hidden.
+        summary_verdict = _summary_verdict(full_report)
+        verdict_mismatch = (
+            summary_verdict
+            if ai_verdict and summary_verdict and summary_verdict != ai_verdict
+            else None
+        )
+        ai_verdict, verdict_raised_from = _apply_verdict_floor(
+            ai_verdict, extracted.get("apkid", {}),
+        )
+
         import reporter
 
         # Fetch app icon from MobSF (best-effort; works for APK scans and re-runs)
@@ -927,6 +970,8 @@ async def run_scan(
             "ai_verdict":   ai_verdict,
             "ai_summary":   ai_summary,
             "ai_verdict_missing": ai_verdict is None,
+            "ai_verdict_raised_from": verdict_raised_from,
+            "ai_summary_verdict_mismatch": verdict_mismatch,
             "ai_truncated": looks_truncated,
             "prompt_hash":  prompt_hash,
             "user_context": user_context,

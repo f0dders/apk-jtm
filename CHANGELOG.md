@@ -11,11 +11,18 @@ All notable changes are documented here. Versions follow [Semantic Versioning](h
 - **The Settings page no longer offers outdated models** — it kept its own list of default models, separate from the one scans actually use, and the two had drifted apart. A new install was offered `gpt-4o`, `gemini-1.5-pro`, and Groq's retired `llama-3.3-70b-versatile`, and saving the page wrote them into your config. It now shows the same default a scan would use. Existing configurations are unaffected.
 - **Ollama falls back to the recommended model** — with no model configured, Ollama scans used `qwen2.5-coder:32b`, a 20 GB coding model the README advises against. They now use `gemma4:12b`, matching the Settings page.
 - **`.env.example` lists current models** — it still named the models from before v1.13.
+- **A familiar package name no longer earns trust on its own** — the package name is chosen by whoever built the APK, so malware named `com.google.android.gms` could be "recognised" as Google Play Services and its behaviour judged normal. The model is now told to check the code-signing subject against the developer it expects, and to flag a mismatch or a debug certificate as possible impersonation.
+- **A known malware packer now always gives at least a HIGH verdict** — the prompt already required this, but small models did not reliably obey it. The verdict is now raised in code when needed, and the report says that it was raised and why.
+- **A check that did not run is no longer reported as clean** — when APKiD or Quark-Engine was not available, small models often wrote that the app was clean. The prompt now states that "not available" means the check did not happen.
+- **High-severity code issues are no longer dropped from the analysis** — MobSF lists code findings in rule order, and the prompt kept the first 20. A high-severity issue listed after 20 warnings never reached the model. High-severity issues now come first. Manifest issues are sorted the same way.
 
 ### Improvements
 
 - **Dependency versions are now bounded** — the minimum versions dated from 2024, and nothing stopped a fresh install from pulling in an untested major release of an AI provider's library. Each dependency now requires at least the version the test suite last passed against, and the fast-moving ones are capped below their next major version. The launcher upgrades existing installs automatically.
 - **Compare now shows the number of behaviour patterns matched** — it still compared Quark-Engine's own threat level, the mechanical label the report card stopped showing in v1.13. A change in that label alone is no longer reported as a behavioural change.
+- **Verdicts are more consistent across models** — the four risk levels were never defined, so each model used its own scale and the same APK could get a different verdict on each one. The prompt now defines each level, and the overall verdict is based on the worst finding that is not expected for the app.
+- **The model is told when evidence was cut short** — trackers, secrets, URLs and code, manifest and network issues are capped to fit the prompt. A capped category now says "showing 20 of 57", so the model no longer reports the shown count as the total.
+- **A report that contradicts itself is flagged** — the Executive Summary verdict and the final verdict are meant to match. When they do not, the report now shows a notice instead of silently using the final one.
 - **The test suite now runs on Python 3.10 to 3.13** — it previously ran on 3.12 only, although 3.10 is the documented minimum.
 
 ---

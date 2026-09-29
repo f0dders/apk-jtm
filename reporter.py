@@ -504,6 +504,27 @@ def _build_html(app_info: dict, ai_report: str, timestamp: str) -> str:
             '</span></div>'
         )
 
+    # Both notices explain why the badge may not match what the reader sees in
+    # the written report below it.
+    raised_from = app_info.get("ai_verdict_raised_from")
+    if raised_from:
+        truncated_html += (
+            '<div class="model-disclaimer">'
+            '<span class="model-disclaimer-icon">⚠️</span>'
+            f'<span>The model rated this app {_esc(raised_from)}. The verdict was raised to '
+            f'{_esc(ai_verdict_raw)} automatically, because APKiD found a packer that is known '
+            'to be used to hide malware.</span></div>'
+        )
+    mismatch = app_info.get("ai_summary_verdict_mismatch")
+    if mismatch:
+        truncated_html += (
+            '<div class="model-disclaimer">'
+            '<span class="model-disclaimer-icon">⚠️</span>'
+            f'<span>The model contradicted itself: its summary rates this app {_esc(mismatch)}, '
+            'but its final verdict is different. The badge shows the final verdict. Read the '
+            'report with care, or re-run it with a more capable model.</span></div>'
+        )
+
     disclaimer_html = ""
     if tier_disclaimer:
         disclaimer_html = (

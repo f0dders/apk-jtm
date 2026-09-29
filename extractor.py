@@ -141,6 +141,9 @@ def _extract_code_issues(report: dict) -> list:
                 "files": list(_as_dict(value.get("files")).keys())[:5],
             })
 
+    # MobSF returns findings in rule order, not severity order. Sort high before
+    # warning so the caps here and in the prompt drop the least severe first.
+    issues.sort(key=lambda i: i["severity"] != "high")
     return issues[:40]
 
 

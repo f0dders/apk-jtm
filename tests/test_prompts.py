@@ -57,7 +57,8 @@ def test_empty_categories_are_stated_not_omitted():
     prompt = prompts.build_analysis_prompt(MINIMAL_EXTRACTED)
     for category in ("Dangerous permissions", "Tracking SDKs",
                      "Network domains (0 total)", "Hardcoded URLs",
-                     "AndroidManifest issues", "Static code analysis issues",
+                     "AndroidManifest issues (high and warning severity only)",
+                     "Static code analysis issues (high and warning severity only)",
                      "Exported components (reachable by other apps)",
                      "Server locations (from MobSF geolocation)"):
         assert f"{category}: none found" in prompt.user, category
@@ -265,3 +266,51 @@ def test_no_packer_brand_names_appear_in_prompt():
         prompt = prompts.build_analysis_prompt(MINIMAL_EXTRACTED, tier=tier)
         for name in banned_names:
             assert name not in prompt.user, f"Found '{name}' in {tier} tier"
+
+
+# ── Risk scale, absent checks and signing ───────────────────────────────────
+
+def test_system_prompt_defines_all_four_risk_levels():
+    """Without a defined scale each model invents its own, so the same evidence
+    gets a different verdict on every run."""
+    system = prompts.build_analysis_prompt(MINIMAL_EXTRACTED).system
+    assert "## Risk scale" in system
+    for level in ("CRITICAL", "HIGH", "MEDIUM", "LOW"):
+        assert f"- **{level}**" in system, level
+
+
+def test_system_prompt_says_not_available_is_not_clean():
+    """A check that never ran must not be reported as a clean result."""
+    system = prompts.build_analysis_prompt(MINIMAL_EXTRACTED).system
+    assert '"not available" is not "clean"' in system
+
+
+def test_both_tiers_check_signing_subject_against_recognised_developer():
+    """A familiar package name proves nothing: whoever built the APK chose it."""
+    for tier in ("frontier", "unknown"):
+        user = prompts.build_analysis_prompt(MINIMAL_EXTRACTED, tier=tier).user
+        assert "signing" in user, tier
+        assert "impersonating" in user, tier
+
+
+# ── Truncated categories state their true size ─────────────────────────────
+
+def test_truncated_category_states_its_true_size():
+    """A model shown 20 of 25 trackers will otherwise report 20 as the total."""
+    prompt = prompts.build_analysis_prompt(_with(trackers=[f"Tracker {n}" for n in range(25)]))
+    assert "Tracking SDKs (showing 20 of 25)" in prompt.user
+
+
+def test_untruncated_category_makes_no_showing_claim():
+    prompt = prompts.build_analysis_prompt(_with(trackers=[f"Tracker {n}" for n in range(5)]))
+    line = next(l for l in prompt.user.splitlines() if l.startswith("Tracking SDKs"))
+    assert "showing" not in line
+
+
+def test_manifest_issues_are_cut_high_first():
+    """The cap must drop the least severe issues, not the last ones listed."""
+    issues = [{"severity": "warning", "title": f"Warn {n}", "description": "d"} for n in range(20)]
+    issues.append({"severity": "high", "title": "Serious one", "description": "d"})
+    prompt = prompts.build_analysis_prompt(_with(manifest_issues=issues))
+    assert "Serious one" in prompt.user
+    assert "(showing 15 of 21)" in prompt.user

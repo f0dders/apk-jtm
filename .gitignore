@@ -40,3 +40,6 @@ report_*.md
 
 # Offline bundle build output (scripts/build_offline_bundle.sh)
 dist/
+
+# Local planning notes (not for distribution)
+docs/ROADMAP.md
